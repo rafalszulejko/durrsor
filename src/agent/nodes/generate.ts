@@ -92,8 +92,9 @@ export const generate = async (state: GraphStateType, logService: LogService) =>
   
   // Get diff and create commit
   state.diff = await GitService.diff();
-  logService.public(`Changes made:\n\`\`\`diff\n${state.diff}\n\`\`\``);
-  
+  logService.public(`Changes made:`);
+  logService.diff(`${state.diff}`);
+
   logService.thinking("Generating commit message...");
   const commitMsgResponse = await model.invoke([
     { 

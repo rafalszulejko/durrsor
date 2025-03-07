@@ -6,7 +6,8 @@ import * as vscode from 'vscode';
 export enum LogLevel {
   INTERNAL = 'internal', // Console only
   THINKING = 'thinking', // Displayed on screen with less contrast
-  PUBLIC = 'public'      // Normal response formatting
+  PUBLIC = 'public',     // Normal response formatting
+  DIFF = 'diff'          // Rendered in a separate frame with diff highlighting
 }
 
 /**
@@ -19,7 +20,7 @@ export class LogService {
   /**
    * Log a message with the specified level
    * 
-   * @param level The log level (internal, thinking, public)
+   * @param level The log level (internal, thinking, public, diff)
    * @param message The message to log
    */
   log(level: LogLevel, message: string): void {
@@ -28,6 +29,8 @@ export class LogService {
       console.log(`[INTERNAL] ${message}`);
     } else if (level === LogLevel.THINKING) {
       console.log(`[THINKING] ${message}`);
+    } else if (level === LogLevel.DIFF) {
+      console.log(`[DIFF] ${message}`);
     } else {
       console.log(`[PUBLIC] ${message}`);
     }
@@ -63,5 +66,14 @@ export class LogService {
    */
   public(message: string): void {
     this.log(LogLevel.PUBLIC, message);
+  }
+
+  /**
+   * Log a diff message (rendered with diff syntax highlighting)
+   * 
+   * @param message The diff content to log
+   */
+  diff(message: string): void {
+    this.log(LogLevel.DIFF, message);
   }
 } 

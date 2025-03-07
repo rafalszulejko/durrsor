@@ -2,6 +2,7 @@
 import MarkdownIt from 'markdown-it';
 import hljs from 'highlight.js';
 import 'highlight.js/styles/github.css';
+import 'highlight.js/styles/vs2015.css';
 
 // Declare the VS Code API
 declare function acquireVsCodeApi(): {
@@ -271,8 +272,33 @@ declare function acquireVsCodeApi(): {
       const logMessage = document.createElement('div');
       logMessage.className = `log-message ${level}-message`;
       
+      // For diff messages, use special rendering with diff highlighting
+      if (level === 'diff') {
+        // Create a container for the diff content
+        const diffContainer = document.createElement('div');
+        diffContainer.className = 'diff-container';
+        
+        // Extract code content if wrapped in markdown code blocks
+        let diffContent = message;
+        if (message.includes('```')) {
+          const codeMatch = message.match(/```(?:diff)?\s*([\s\S]*?)```/);
+          if (codeMatch && codeMatch[1]) {
+            diffContent = codeMatch[1];
+          }
+        }
+        
+        // Create pre and code elements for syntax highlighting
+        const pre = document.createElement('pre');
+        const code = document.createElement('code');
+        code.className = 'language-diff hljs';
+        code.innerHTML = hljs.highlight(diffContent, { language: 'diff' }).value;
+        
+        pre.appendChild(code);
+        diffContainer.appendChild(pre);
+        logMessage.appendChild(diffContainer);
+      } 
       // For code blocks, use markdown rendering
-      if (message.includes('```')) {
+      else if (message.includes('```')) {
         logMessage.innerHTML = md.render(message);
       } else {
         // For regular messages, just set text content with a line break

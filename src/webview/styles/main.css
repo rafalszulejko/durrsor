@@ -195,6 +195,40 @@ code {
   color: var(--vscode-foreground);
 }
 
+.diff-message {
+  color: var(--vscode-foreground);
+}
+
+.diff-container {
+  margin: 4px 0;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.diff-container pre {
+  margin: 0;
+  padding: 4px;
+  background-color: transparent;
+}
+
+.diff-container code {
+  font-family: var(--vscode-editor-font-family);
+  font-size: var(--vscode-editor-font-size);
+  line-height: var(--vscode-editor-line-height);
+}
+
+/* Override highlight.js vs2015 theme for diff language */
+.diff-container .hljs-addition {
+  background-color: rgba(40, 167, 69, 0.15);
+  color: #28a745;
+}
+
+.diff-container .hljs-deletion {
+  background-color: rgba(203, 36, 49, 0.15);
+  color: #cb2431;
+}
+
 /* Remove old thinking and public sections */
 .thinking-section,
 .thinking-content,
