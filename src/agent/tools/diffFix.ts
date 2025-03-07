@@ -1,4 +1,5 @@
 import * as fs from 'fs';
+import { FileService } from '../../services/fileService';
 
 /**
  * Fix incorrect line numbers in a unified diff by identifying the correct location in the original file.
@@ -8,9 +9,11 @@ import * as fs from 'fs';
  * @param incorrectDiff Content of the diff with incorrect line numbers
  * @returns Updated diff with correct line numbers and file headers
  */
-export function fixDiffLineNumbers(originalFilePath: string, incorrectDiff: string): string {
-    // Read the original file
-    const originalContent = fs.readFileSync(originalFilePath, 'utf-8').split('\n');
+export async function fixDiffLineNumbers(originalFilePath: string, incorrectDiff: string): Promise<string> {
+    // Read the original file using VSCode API
+    const fileService = new FileService();
+    const content = await fileService.getFileContent(originalFilePath);
+    const originalContent = content.split('\n');
 
     // Parse the incorrect diff to extract the context
     const diffLines = incorrectDiff.trim().split('\n');

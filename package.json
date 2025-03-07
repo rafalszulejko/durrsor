@@ -3,6 +3,7 @@
   "displayName": "durrsor",
   "description": "ai-powered code editor",
   "version": "0.0.1",
+  "type": "commonjs",
   "engines": {
     "vscode": "^1.97.0"
   },
@@ -35,15 +36,27 @@
           "name": "Durrsor Assistant"
         }
       ]
+    },
+    "configuration": {
+      "title": "Durrsor",
+      "properties": {
+        "durrsor.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "API key for the Durrsor service"
+        }
+      }
     }
   },
   "scripts": {
     "vscode:prepublish": "npm run package",
     "compile": "npm run check-types && npm run lint && node esbuild.js",
+    "compile:fast": "node esbuild.js",
     "watch": "npm-run-all -p watch:*",
     "watch:esbuild": "node esbuild.js --watch",
     "watch:tsc": "tsc --noEmit --watch --project tsconfig.json",
     "package": "npm run check-types && npm run lint && node esbuild.js --production",
+    "package:fast": "node esbuild.js --production",
     "compile-tests": "tsc -p . --outDir out",
     "watch-tests": "tsc -p . -w --outDir out",
     "pretest": "npm run compile-tests && npm run compile && npm run lint",
@@ -53,6 +66,7 @@
   },
   "devDependencies": {
     "@types/diff": "^7.0.1",
+    "@types/markdown-it": "^14.1.2",
     "@types/mocha": "^10.0.10",
     "@types/node": "20.x",
     "@types/vscode": "^1.97.0",
@@ -71,6 +85,9 @@
     "@langchain/langgraph": "^0.2.54",
     "@langchain/openai": "^0.4.4",
     "diff": "^7.0.0",
+    "highlight.js": "^11.11.1",
+    "markdown-it": "^14.1.0",
+    "markdown-it-highlightjs": "^4.2.0",
     "openai": "^4.86.1"
   }
 }

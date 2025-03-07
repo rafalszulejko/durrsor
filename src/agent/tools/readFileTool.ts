@@ -1,6 +1,7 @@
-import * as fs from 'fs';
 import { z } from 'zod';
 import { DynamicStructuredTool } from '@langchain/core/tools';
+import * as vscode from 'vscode';
+import { FileService } from '../../services/fileService';
 
 /**
  * Interface for the output of the file reading operation
@@ -13,22 +14,24 @@ interface ReadFileOutput {
 }
 
 /**
- * Read the contents of the specified file.
- * @param filePath Path to the file to be read
+ * Read the contents of the specified file using VSCode API.
+ * @param filePath Path to the file to be read (relative to workspace)
  * @returns Result of the file reading operation
  */
-function readFile(filePath: string): ReadFileOutput {
+async function readFile(filePath: string): Promise<ReadFileOutput> {
   try {
-    if (!fs.existsSync(filePath)) {
+    console.log(`Reading file: ${filePath} using vscode api`);
+    const fileService = new FileService();
+    const content = await fileService.getFileContent(filePath);
+    
+    if (content === '') {
       return {
         success: false,
         content: '',
-        message: `File '${filePath}' does not exist`,
+        message: `File '${filePath}' does not exist or could not be read`,
         filePath
       };
     }
-    
-    const content = fs.readFileSync(filePath, 'utf-8');
     
     return {
       success: true,
@@ -61,7 +64,7 @@ export const createReadFileTool = new DynamicStructuredTool({
     }),
     func: async ({ filePath }) => {
       try {
-        const result = readFile(filePath);
+        const result = await readFile(filePath);
         return JSON.stringify(result);
       } catch (e) {
         const error = e as Error;
@@ -72,6 +75,6 @@ export const createReadFileTool = new DynamicStructuredTool({
           filePath
         };
         return JSON.stringify(result);
-        }
+      }
     }
   });

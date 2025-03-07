@@ -4,7 +4,8 @@ import { createReactAgent } from "@langchain/langgraph/prebuilt";
 import fs from "fs/promises";
 import path from "path";
 import { GraphStateType } from "../graphState";
-
+import * as vscode from 'vscode';
+import { FileService } from "../../services/fileService";
 /**
  * Analyze node that processes the initial state and prepares it for code generation.
  * 
@@ -12,10 +13,14 @@ import { GraphStateType } from "../graphState";
  * 2. Refines the user prompt into a precise action plan
  */
 export const analyze = async (state: GraphStateType) => {
+
+  const config = vscode.workspace.getConfiguration('durrsor');
+  const apiKey = config.get<string>('apiKey') || process.env.OPENAI_API_KEY || '';
   // Initialize the model
   const model = new ChatOpenAI({
     modelName: "gpt-4o",
-    temperature: 0
+    temperature: 0,
+    apiKey: apiKey
   });
   
   // Create the agent for context gathering
@@ -67,11 +72,12 @@ export const analyze = async (state: GraphStateType) => {
   }
 
   console.log(`selected_files: ${state.selected_files}`);
-  
+  const fileService = new FileService();
+
   // Read content of all selected files
   for (const file of state.selected_files) {
     try {
-      const content = await fs.readFile(path.join("code", file), "utf-8");
+      const content = await fileService.getFileContent(file);
       gatheredContext += `${file}\n\`\`\`\n${content}\n\`\`\`\n\n`;
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -81,11 +87,6 @@ export const analyze = async (state: GraphStateType) => {
   
   console.log(`gatheredContext:\n${gatheredContext}`);
   
-  // Make an LLM call to refine the prompt
-  const promptRefiner = new ChatOpenAI({
-    modelName: "gpt-4",
-    temperature: 0
-  });
   
   const messages = [
     {
@@ -113,7 +114,7 @@ What precise changes need to be made to which files?`
     }
   ];
   
-  const refinedResponse = await promptRefiner.invoke(messages);
+  const refinedResponse = await model.invoke(messages);
   console.log(`refined_response:\n\`\`\`${refinedResponse.content}\`\`\``);
   
   // Return updated state

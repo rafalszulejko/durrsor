@@ -13,7 +13,7 @@ export async function diff(directory: string = "code"): Promise<string> {
   try {
     const { stdout } = await execAsync('git diff', { cwd: directory });
     return stdout;
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error running git diff:', error);
     return `Error running git diff: ${error.message}`;
   }
@@ -43,7 +43,7 @@ export async function addAllAndCommit(commitMessage: string, directory: string =
     } else {
       return `Commit failed: ${stderr}`;
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error in git operation:', error);
     return `Error in git operation: ${error.message}`;
   }
@@ -80,7 +80,7 @@ export async function createAndCheckoutBranch(branchName: string, directory: str
   try {
     const { stdout } = await execAsync(`git checkout -b durrsor-${branchName}`, { cwd: directory });
     return stdout.trim();
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error creating branch:', error);
     return `Error creating branch: ${error.message}`;
   }
@@ -96,7 +96,7 @@ export async function getCurrentBranch(directory: string = "code"): Promise<stri
   try {
     const { stdout } = await execAsync('git rev-parse --abbrev-ref HEAD', { cwd: directory });
     return stdout.trim();
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error getting current branch:', error);
     return `Error getting current branch: ${error.message}`;
   }
@@ -146,7 +146,7 @@ export async function squashAndMergeToBranch(
     const { stdout: hashOutput } = await execAsync('git rev-parse HEAD', { cwd: directory });
     
     return `Successfully squashed and merged ${currentBranch} into ${targetBranch}\nCommit: ${hashOutput.trim()}`;
-  } catch (error) {
+  } catch (error: any) {
     // Attempt to abort merge if it failed
     try {
       await execAsync('git merge --abort', { cwd: directory });

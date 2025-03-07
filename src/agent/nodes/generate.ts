@@ -4,6 +4,7 @@ import { createReactAgent } from "@langchain/langgraph/prebuilt";
 import { z } from "zod";
 import * as git from "../utils/git";
 import { GraphStateType } from "../graphState";
+import * as vscode from 'vscode';
 
 /**
  * Generate node that:
@@ -14,10 +15,15 @@ import { GraphStateType } from "../graphState";
  * @returns Updated state with modified files tracked
  */
 export const generate = async (state: GraphStateType) => {
+  // Get API key from extension settings
+  const config = vscode.workspace.getConfiguration('durrsor');
+  const apiKey = config.get<string>('apiKey') || process.env.OPENAI_API_KEY || '';
+  
   // Initialize the model for the first LLM call
   const model = new ChatOpenAI({
     modelName: "gpt-4o",
-    temperature: 0
+    temperature: 0,
+    apiKey: apiKey
   });
   
   // Create messages array similar to the notebook example
