@@ -81,7 +81,7 @@ declare function acquireVsCodeApi(): {
         showLoadingIndicator();
         break;
       case 'logMessage':
-        handleLogMessage(message.level, message.message);
+        handleLogMessage(message.level, message.message, message.isNewType);
         break;
     }
   });
@@ -250,7 +250,7 @@ declare function acquireVsCodeApi(): {
     }
   }
   
-  function handleLogMessage(level: string, message: string) {
+  function handleLogMessage(level: string, message: string, isNewType?: boolean) {
     // If we don't have a current AI message, create one
     if (!currentAIMessage) {
       showLoadingIndicator();
@@ -271,6 +271,11 @@ declare function acquireVsCodeApi(): {
       // Create a log message with appropriate class based on level
       const logMessage = document.createElement('div');
       logMessage.className = `log-message ${level}-message`;
+      
+      // Add a class for new log types to add extra spacing
+      if (isNewType) {
+        logMessage.classList.add('new-log-type');
+      }
       
       // For diff messages, use special rendering with diff highlighting
       if (level === 'diff') {
@@ -296,7 +301,44 @@ declare function acquireVsCodeApi(): {
         pre.appendChild(code);
         diffContainer.appendChild(pre);
         logMessage.appendChild(diffContainer);
-      } 
+      }
+      // For tool messages, display tool name and message in a thin frame
+      else if (level === 'tool') {
+        // Create a container for the tool content
+        const toolContainer = document.createElement('div');
+        toolContainer.className = 'tool-container';
+        
+        // Split the message into tool name and content
+        const messageParts = message.split(': ');
+        if (messageParts.length >= 2) {
+          const toolName = messageParts[0];
+          const toolContent = messageParts.slice(1).join(': ');
+          
+          // Create elements for tool name and content
+          const toolNameElement = document.createElement('span');
+          toolNameElement.className = 'tool-name';
+          toolNameElement.textContent = toolName;
+          
+          const toolContentElement = document.createElement('span');
+          toolContentElement.className = 'tool-content';
+          
+          // If the content contains code blocks, render with markdown
+          if (toolContent.includes('```')) {
+            toolContentElement.innerHTML = md.render(toolContent);
+          } else {
+            toolContentElement.textContent = toolContent;
+          }
+          
+          toolContainer.appendChild(toolNameElement);
+          toolContainer.appendChild(toolContentElement);
+          logMessage.appendChild(toolContainer);
+        } else {
+          // Fallback if message format is unexpected
+          const formattedMessage = document.createElement('p');
+          formattedMessage.textContent = message;
+          logMessage.appendChild(formattedMessage);
+        }
+      }
       // For code blocks, use markdown rendering
       else if (message.includes('```')) {
         logMessage.innerHTML = md.render(message);

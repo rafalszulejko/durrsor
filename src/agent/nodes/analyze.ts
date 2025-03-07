@@ -25,7 +25,7 @@ export const analyze = async (state: GraphStateType, logService: LogService) => 
   });
   
   // Create the agent for context gathering
-  const tools = [createReadFileTool];
+  const tools = [createReadFileTool(logService)];
   const contextAgent = createReactAgent({
     llm: model,
     tools,
@@ -60,7 +60,7 @@ export const analyze = async (state: GraphStateType, logService: LogService) => 
   logService.thinking("Agent is analyzing the code context...");
   // Process all tool call arguments
   for (const msg of agentResult.messages) {
-    logService.thinking(`Agent message: ${typeof msg.content === 'string' ? msg.content.substring(0, 100) + '...' : 'Non-text content'}`);
+    // logService.thinking(`Agent message: ${typeof msg.content === 'string' ? msg.content.substring(0, 100) + '...' : 'Non-text content'}`);
     // Check if the message has tool calls (using type assertion with caution)
     const msgAny = msg as any;
     if (msgAny.tool_calls) {
@@ -81,10 +81,10 @@ export const analyze = async (state: GraphStateType, logService: LogService) => 
     try {
       const content = await fileService.getFileContent(file);
       gatheredContext += `${file}\n\`\`\`\n${content}\n\`\`\`\n\n`;
-      logService.thinking(`Read file: ${file}`);
+      logService.internal(`Read file: ${file}`);
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      logService.internal(`Error reading file ${file}: ${errorMessage}`);
+      logService.error('analyze', `Error reading file ${file}: ${errorMessage}`);
     }
   }
   

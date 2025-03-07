@@ -53,7 +53,7 @@ export const generate = async (state: GraphStateType, logService: LogService) =>
   });
   
   // Create the agent to apply the changes
-  const tools = [createEditTool];
+  const tools = [createEditTool(logService)];
   const agent = createReactAgent({
     llm: model,
     tools,
@@ -71,14 +71,14 @@ export const generate = async (state: GraphStateType, logService: LogService) =>
   const files_modified = [];
   
   for (const msg of agentResult.messages) {
-    logService.thinking(`Agent action: ${typeof msg.content === 'string' ? msg.content.substring(0, 100) + '...' : 'Non-text content'}`);
+    // logService.thinking(`Agent action: ${typeof msg.content === 'string' ? msg.content.substring(0, 100) + '...' : 'Non-text content'}`);
     if (msg.content && typeof msg.content === 'string' && 
         msg.content.includes("Successfully applied diff to file")) {
       // Extract file path using regex
       const fileMatch = msg.content.match(/file `([^`]+)`/);
       if (fileMatch) {
         files_modified.push(fileMatch[1]);
-        logService.public(`Modified file: ${fileMatch[1]}`);
+        // logService.public(`Modified file: ${fileMatch[1]}`);
       }
     }
   }

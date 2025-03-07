@@ -176,6 +176,11 @@ code {
   margin-bottom: 4px;
 }
 
+/* Add extra spacing for messages of a different type than the previous one */
+.log-message.new-log-type {
+  margin-top: 12px;
+}
+
 .log-message p {
   margin: 0;
   padding: 0;
@@ -199,11 +204,38 @@ code {
   color: var(--vscode-foreground);
 }
 
+.tool-message {
+  color: var(--vscode-foreground);
+}
+
+.error-message {
+  color: var(--vscode-errorForeground);
+}
+
 .diff-container {
   margin: 4px 0;
   border: 1px solid var(--vscode-panel-border);
   border-radius: 3px;
   overflow: hidden;
+}
+
+.tool-container {
+  margin: 4px 0;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 3px;
+  overflow: hidden;
+  padding: 4px 8px;
+  background-color: var(--vscode-editor-inactiveSelectionBackground);
+}
+
+.tool-name {
+  color: var(--vscode-descriptionForeground);
+  opacity: 0.8;
+  margin-right: 8px;
+}
+
+.tool-content {
+  display: inline;
 }
 
 .diff-container pre {

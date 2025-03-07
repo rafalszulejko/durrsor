@@ -22,12 +22,13 @@ class DurrsorViewProvider implements vscode.WebviewViewProvider {
 		this._fileService = new FileService();
 		
 		// Subscribe to log messages
-		this._logService.onLogMessage(({ level, message }) => {
+		this._logService.onLogMessage(({ level, message, isNewType }) => {
 			if (this._view) {
 				this._view.webview.postMessage({
 					command: 'logMessage',
 					level,
-					message
+					message,
+					isNewType
 				});
 			}
 		});
