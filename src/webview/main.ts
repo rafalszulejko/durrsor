@@ -41,6 +41,8 @@ declare function acquireVsCodeApi(): {
   
   // State
   let selectedFiles: string[] = [];
+  let currentAIMessage: HTMLElement | null = null;
+  let currentLogContainer: HTMLElement | null = null;
   
   // Event listeners
   sendButton?.addEventListener('click', sendPrompt);
@@ -61,13 +63,24 @@ declare function acquireVsCodeApi(): {
     
     switch (message.command) {
       case 'agentResponse':
-        addAIMessage(message.response, message.files);
+        // If we already have a message with content, just update the files
+        if (currentAIMessage) {
+          updateFilesModified(currentAIMessage, message.files);
+        } else {
+          addAIMessage(message.response, message.files);
+        }
+        // Reset current message tracking
+        currentAIMessage = null;
+        currentLogContainer = null;
         break;
       case 'selectedFiles':
         updateSelectedFiles(message.files);
         break;
       case 'showLoading':
         showLoadingIndicator();
+        break;
+      case 'logMessage':
+        handleLogMessage(message.level, message.message);
         break;
     }
   });
@@ -145,6 +158,25 @@ declare function acquireVsCodeApi(): {
     messageElement.appendChild(responseElement);
     
     if (files && files.length > 0) {
+      updateFilesModified(messageElement, files);
+    }
+    
+    chatContainer?.appendChild(messageElement);
+    if (chatContainer) {
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
+    
+    return messageElement;
+  }
+  
+  function updateFilesModified(messageElement: HTMLElement, files: string[]) {
+    // Remove existing files element if present
+    const existingFilesElement = messageElement.querySelector('.files-modified');
+    if (existingFilesElement) {
+      existingFilesElement.remove();
+    }
+    
+    if (files && files.length > 0) {
       const filesElement = document.createElement('div');
       filesElement.className = 'files-modified';
       filesElement.innerHTML = `<strong>Files modified:</strong>`;
@@ -158,11 +190,6 @@ declare function acquireVsCodeApi(): {
       
       filesElement.appendChild(filesList);
       messageElement.appendChild(filesElement);
-    }
-    
-    chatContainer?.appendChild(messageElement);
-    if (chatContainer) {
-      chatContainer.scrollTop = chatContainer.scrollHeight;
     }
   }
   
@@ -193,13 +220,74 @@ declare function acquireVsCodeApi(): {
   }
   
   function showLoadingIndicator() {
+    // Remove any existing loading indicator
+    const existingLoadingIndicator = document.querySelector('.loading-indicator');
+    if (existingLoadingIndicator) {
+      existingLoadingIndicator.remove();
+    }
+    
+    // Create a new AI message container for this response
+    currentAIMessage = document.createElement('div');
+    currentAIMessage.className = 'message ai-message';
+    
+    // Create a single log container for all log messages
+    currentLogContainer = document.createElement('div');
+    currentLogContainer.className = 'log-container';
+    
+    // Add loading indicator
     const loadingElement = document.createElement('div');
-    loadingElement.className = 'message ai-message loading-indicator';
+    loadingElement.className = 'loading-indicator';
     loadingElement.innerHTML = '<div class="loading-spinner"></div><div>Thinking...</div>';
     
-    chatContainer?.appendChild(loadingElement);
+    // Add elements to the message
+    currentAIMessage.appendChild(currentLogContainer);
+    currentAIMessage.appendChild(loadingElement);
+    
+    chatContainer?.appendChild(currentAIMessage);
     if (chatContainer) {
       chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
+  }
+  
+  function handleLogMessage(level: string, message: string) {
+    // If we don't have a current AI message, create one
+    if (!currentAIMessage) {
+      showLoadingIndicator();
+    }
+    
+    // Remove loading indicator if present
+    const loadingIndicator = currentAIMessage?.querySelector('.loading-indicator');
+    if (loadingIndicator) {
+      loadingIndicator.remove();
+    }
+    
+    if (currentLogContainer) {
+      // Skip internal messages
+      if (level === 'internal') {
+        return;
+      }
+      
+      // Create a log message with appropriate class based on level
+      const logMessage = document.createElement('div');
+      logMessage.className = `log-message ${level}-message`;
+      
+      // For code blocks, use markdown rendering
+      if (message.includes('```')) {
+        logMessage.innerHTML = md.render(message);
+      } else {
+        // For regular messages, just set text content with a line break
+        const formattedMessage = document.createElement('p');
+        formattedMessage.textContent = message;
+        logMessage.appendChild(formattedMessage);
+      }
+      
+      // Add to the log container
+      currentLogContainer.appendChild(logMessage);
+      
+      // Scroll to bottom
+      if (chatContainer) {
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+      }
     }
   }
 })(); 

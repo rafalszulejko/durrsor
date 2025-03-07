@@ -94,17 +94,17 @@ body {
 .message {
   margin-bottom: 16px;
   padding: 12px;
-  border-radius: 6px;
+  border-radius: 8px;
 }
 
 .human-message {
   background-color: var(--vscode-input-background);
-  border-left: 4px solid var(--vscode-activityBarBadge-background);
+  /* No border */
 }
 
 .ai-message {
-  background-color: var(--vscode-editor-inactiveSelectionBackground);
-  border-left: 4px solid var(--vscode-symbolIcon-functionForeground);
+  padding: 0;
+  border-radius: 0;
 }
 
 .files {
@@ -114,13 +114,18 @@ body {
   gap: 4px;
 }
 
-.files-modified {
+.response {
   margin-top: 8px;
-  font-size: 12px;
+}
+
+.files-modified {
+  margin-top: 16px;
+  padding-top: 8px;
+  border-top: 1px solid var(--vscode-editorWidget-border);
 }
 
 .files-modified ul {
-  margin-top: 4px;
+  margin: 8px 0 0 0;
   padding-left: 20px;
 }
 
@@ -141,18 +146,61 @@ code {
 .loading-indicator {
   display: flex;
   align-items: center;
-  gap: 8px;
+  margin-top: 8px;
+  margin-bottom: 8px;
+  color: var(--vscode-descriptionForeground);
 }
 
 .loading-spinner {
   width: 16px;
   height: 16px;
-  border: 2px solid var(--vscode-foreground);
-  border-radius: 50%;
+  margin-right: 8px;
+  border: 2px solid var(--vscode-descriptionForeground);
   border-top-color: transparent;
+  border-radius: 50%;
   animation: spin 1s linear infinite;
 }
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+/* Log container and messages */
+.log-container {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 8px;
+}
+
+.log-message {
+  margin-bottom: 4px;
+}
+
+.log-message p {
+  margin: 0;
+  padding: 0;
+}
+
+.internal-message {
+  display: none; /* Internal messages are not displayed in the UI */
+}
+
+.thinking-message {
+  color: var(--vscode-descriptionForeground);
+  font-style: italic;
+  opacity: 0.8;
+}
+
+.public-message {
+  color: var(--vscode-foreground);
+}
+
+/* Remove old thinking and public sections */
+.thinking-section,
+.thinking-content,
+.thinking-message,
+.public-section,
+.public-content,
+.public-message {
+  /* These styles are kept for backward compatibility but will be replaced by the new log-message styles */
 } 

@@ -5,6 +5,7 @@ import * as path from 'path';
 import { AgentService } from './services/agentService';
 import { FileService } from './services/fileService';
 import { GraphStateType } from './agent/graphState';
+import { LogService, LogLevel } from './services/logService';
 
 // WebView provider class for the sidebar panel
 class DurrsorViewProvider implements vscode.WebviewViewProvider {
@@ -12,11 +13,24 @@ class DurrsorViewProvider implements vscode.WebviewViewProvider {
 	private _view?: vscode.WebviewView;
 	private _agentService: AgentService;
 	private _fileService: FileService;
+	private _logService: LogService;
 	private _previousState?: GraphStateType;
 
 	constructor(private readonly _extensionUri: vscode.Uri) {
-		this._agentService = new AgentService();
+		this._logService = new LogService();
+		this._agentService = new AgentService(this._logService);
 		this._fileService = new FileService();
+		
+		// Subscribe to log messages
+		this._logService.onLogMessage(({ level, message }) => {
+			if (this._view) {
+				this._view.webview.postMessage({
+					command: 'logMessage',
+					level,
+					message
+				});
+			}
+		});
 	}
 
 	resolveWebviewView(

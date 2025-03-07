@@ -1,9 +1,10 @@
 import { StateGraph, START, END } from "@langchain/langgraph";
 import { v4 as uuidv4 } from "uuid";
 import { GraphState, GraphStateType } from "./graphState";
-import { analyze } from "./nodes/analyze";
-import { generate } from "./nodes/generate";
+import { analyze as analyzeNode } from "./nodes/analyze";
+import { generate as generateNode } from "./nodes/generate";
 import { GitService } from "./utils/git";
+import { LogService } from "../services/logService";
 
 /**
  * Agent class that creates and manages a LangGraph workflow for code generation.
@@ -12,15 +13,18 @@ import { GitService } from "./utils/git";
 export class CodeAgent {
   private workflow: StateGraph<typeof GraphState>;
   private app: any; // The compiled LangGraph application
+  private logService: LogService;
 
-  constructor() {
+  constructor(logService: LogService) {
+    this.logService = logService;
+    
     // Initialize the state graph
     this.workflow = new StateGraph(GraphState);
 
-    // Define the nodes
+    // Define the nodes with wrapper functions to pass logService
     this.app = this.workflow
-        .addNode("analyze", analyze)
-        .addNode("generate", generate)
+        .addNode("analyze", (state: GraphStateType) => analyzeNode(state, this.logService))
+        .addNode("generate", (state: GraphStateType) => generateNode(state, this.logService))
         .addEdge(START, "analyze")
         .addEdge("analyze", "generate")
         .addEdge("generate", END)
@@ -59,7 +63,7 @@ export class CodeAgent {
       );
     }
 
-    console.log(`Selected files: ${combinedSelectedFiles}`);
+    this.logService.internal(`Selected files: ${combinedSelectedFiles}`);
 
     // Initialize the new state
     const newState: Partial<GraphStateType> = {
@@ -79,7 +83,7 @@ export class CodeAgent {
       };
     }
 
-    console.log(`Running agent with state:\n\n${JSON.stringify(newState, null, 2)}\n=========================\n`);
+    this.logService.internal(`Running agent with state:\n\n${JSON.stringify(newState, null, 2)}\n=========================\n`);
 
     // Invoke the graph
     return await this.app.invoke(newState);

@@ -5,6 +5,7 @@ import { z } from "zod";
 import { GitService } from "../utils/git";
 import { GraphStateType } from "../graphState";
 import * as vscode from 'vscode';
+import { LogService } from "../../services/logService";
 
 /**
  * Generate node that:
@@ -14,7 +15,7 @@ import * as vscode from 'vscode';
  * @param state Current graph state containing user prompt and code context
  * @returns Updated state with modified files tracked
  */
-export const generate = async (state: GraphStateType) => {
+export const generate = async (state: GraphStateType, logService: LogService) => {
   // Get API key from extension settings
   const config = vscode.workspace.getConfiguration('durrsor');
   const apiKey = config.get<string>('apiKey') || process.env.OPENAI_API_KEY || '';
@@ -44,7 +45,7 @@ export const generate = async (state: GraphStateType) => {
   
   // Make the LLM call
   const response = await model.invoke(messages);
-  console.log(`response:\n\`\`\`${response.content}\`\`\``);
+  logService.thinking(`Generated code changes:\n\`\`\`\n${response.content}\n\`\`\``);
 
   // Define the schema for edited files
   const editedFilesSchema = z.object({
@@ -60,6 +61,7 @@ export const generate = async (state: GraphStateType) => {
     responseFormat: { type: "json_object", schema: editedFilesSchema }
   });
   
+  logService.thinking("Applying code changes...");
   // Run the agent with the LLM response
   const agentResult = await agent.invoke({
     messages: [{ role: "user", content: response.content }]
@@ -68,15 +70,15 @@ export const generate = async (state: GraphStateType) => {
   // Extract modified file paths from agent result
   const files_modified = [];
   
-  console.log("agent messages:");
   for (const msg of agentResult.messages) {
-    console.log(`msg:\n${JSON.stringify(msg)}`);
+    logService.thinking(`Agent action: ${typeof msg.content === 'string' ? msg.content.substring(0, 100) + '...' : 'Non-text content'}`);
     if (msg.content && typeof msg.content === 'string' && 
         msg.content.includes("Successfully applied diff to file")) {
       // Extract file path using regex
       const fileMatch = msg.content.match(/file `([^`]+)`/);
       if (fileMatch) {
         files_modified.push(fileMatch[1]);
+        logService.public(`Modified file: ${fileMatch[1]}`);
       }
     }
   }
@@ -90,8 +92,9 @@ export const generate = async (state: GraphStateType) => {
   
   // Get diff and create commit
   state.diff = await GitService.diff();
-  console.log(`diff:\n${state.diff}`);
+  logService.public(`Changes made:\n\`\`\`diff\n${state.diff}\n\`\`\``);
   
+  logService.thinking("Generating commit message...");
   const commitMsgResponse = await model.invoke([
     { 
       role: "system", 
@@ -107,12 +110,13 @@ export const generate = async (state: GraphStateType) => {
     }
   ]);
   
-  console.log(`commit_msg:\n${commitMsgResponse.content}`);
+  logService.thinking(`Commit message: ${commitMsgResponse.content}`);
   // Convert MessageContent to string
   const commitMessage = typeof commitMsgResponse.content === 'string' 
     ? commitMsgResponse.content 
     : JSON.stringify(commitMsgResponse.content);
   state.commit_hash = await GitService.addAllAndCommit(commitMessage);
+  logService.public(`Changes committed with message: ${commitMessage}`);
 
   // Add a summary of changes to previous_changes
   if (!state.conversation_data) {

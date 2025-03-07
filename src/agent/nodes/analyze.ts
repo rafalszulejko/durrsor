@@ -6,13 +6,14 @@ import path from "path";
 import { GraphStateType } from "../graphState";
 import * as vscode from 'vscode';
 import { FileService } from "../../services/fileService";
+import { LogService } from "../../services/logService";
 /**
  * Analyze node that processes the initial state and prepares it for code generation.
  * 
  * 1. Uses reactive agent to gather relevant file contents
  * 2. Refines the user prompt into a precise action plan
  */
-export const analyze = async (state: GraphStateType) => {
+export const analyze = async (state: GraphStateType, logService: LogService) => {
 
   const config = vscode.workspace.getConfiguration('durrsor');
   const apiKey = config.get<string>('apiKey') || process.env.OPENAI_API_KEY || '';
@@ -44,7 +45,7 @@ export const analyze = async (state: GraphStateType) => {
       .join("\n");
   }
 
-  console.log(`previous_changes_text:\n${previousChangesText}`);
+  logService.internal(`previous_changes_text:\n${previousChangesText}`);
   
   // Run the agent to gather context
   const agentResult = await contextAgent.invoke({
@@ -56,22 +57,23 @@ export const analyze = async (state: GraphStateType) => {
 
   let gatheredContext = "";
 
-  console.log("agent messages:\n");
+  logService.thinking("Agent is analyzing the code context...");
   // Process all tool call arguments
   for (const msg of agentResult.messages) {
-    console.log(`msg:\n${JSON.stringify(msg)}`);
+    logService.thinking(`Agent message: ${typeof msg.content === 'string' ? msg.content.substring(0, 100) + '...' : 'Non-text content'}`);
     // Check if the message has tool calls (using type assertion with caution)
     const msgAny = msg as any;
     if (msgAny.tool_calls) {
       for (const call of msgAny.tool_calls) {
         if (!state.selected_files.includes(call.args.file_path)) {
           state.selected_files.push(call.args.file_path);
+          logService.thinking(`Adding file to context: ${call.args.file_path}`);
         }
       }
     }
   }
 
-  console.log(`selected_files: ${state.selected_files}`);
+  logService.thinking(`Selected files for analysis: ${state.selected_files.join(', ')}`);
   const fileService = new FileService();
 
   // Read content of all selected files
@@ -79,15 +81,16 @@ export const analyze = async (state: GraphStateType) => {
     try {
       const content = await fileService.getFileContent(file);
       gatheredContext += `${file}\n\`\`\`\n${content}\n\`\`\`\n\n`;
+      logService.thinking(`Read file: ${file}`);
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error(`Error reading file ${file}: ${errorMessage}`);
+      logService.internal(`Error reading file ${file}: ${errorMessage}`);
     }
   }
   
-  console.log(`gatheredContext:\n${gatheredContext}`);
+  logService.internal(`gatheredContext:\n${gatheredContext}`);
   
-  
+  logService.thinking("Analyzing code to determine necessary changes...");
   const messages = [
     {
       role: "system",
@@ -115,7 +118,8 @@ What precise changes need to be made to which files?`
   ];
   
   const refinedResponse = await model.invoke(messages);
-  console.log(`refined_response:\n\`\`\`${refinedResponse.content}\`\`\``);
+  logService.public(`Analysis complete. Determined changes needed:`);
+  logService.public(`${refinedResponse.content}`);
   
   // Return updated state
   return {
