@@ -2,7 +2,7 @@ import { ChatOpenAI } from "@langchain/openai";
 import { createEditTool } from "../tools/editTool";
 import { createReactAgent } from "@langchain/langgraph/prebuilt";
 import { z } from "zod";
-import * as git from "../utils/git";
+import { GitService } from "../utils/git";
 import { GraphStateType } from "../graphState";
 import * as vscode from 'vscode';
 
@@ -89,7 +89,7 @@ export const generate = async (state: GraphStateType) => {
   }
   
   // Get diff and create commit
-  state.diff = await git.diff();
+  state.diff = await GitService.diff();
   console.log(`diff:\n${state.diff}`);
   
   const commitMsgResponse = await model.invoke([
@@ -112,7 +112,7 @@ export const generate = async (state: GraphStateType) => {
   const commitMessage = typeof commitMsgResponse.content === 'string' 
     ? commitMsgResponse.content 
     : JSON.stringify(commitMsgResponse.content);
-  state.commit_hash = await git.addAllAndCommit(commitMessage);
+  state.commit_hash = await GitService.addAllAndCommit(commitMessage);
 
   // Add a summary of changes to previous_changes
   if (!state.conversation_data) {

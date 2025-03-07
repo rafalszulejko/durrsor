@@ -3,7 +3,7 @@ import { v4 as uuidv4 } from "uuid";
 import { GraphState, GraphStateType } from "./graphState";
 import { analyze } from "./nodes/analyze";
 import { generate } from "./nodes/generate";
-import * as git from "./utils/git";
+import { GitService } from "./utils/git";
 
 /**
  * Agent class that creates and manages a LangGraph workflow for code generation.
@@ -48,7 +48,7 @@ export class CodeAgent {
     } else {
       threadId = uuidv4();
       // Create new branch for this thread
-      await git.createAndCheckoutBranch(threadId);
+      await GitService.createAndCheckoutBranch(threadId);
     }
 
     // Combine selected files with previous ones if available
@@ -92,7 +92,7 @@ export class CodeAgent {
    * @returns The parent branch name
    */
   async getParentBranch(threadId: string): Promise<string> {
-    const currentBranch = await git.getCurrentBranch();
+    const currentBranch = await GitService.getCurrentBranch();
     return currentBranch.replace(`durrsor-${threadId}`, '');
   }
 
@@ -105,6 +105,6 @@ export class CodeAgent {
    */
   async squashAndMergeToParent(threadId: string, commitMessage?: string): Promise<string> {
     const parentBranch = await this.getParentBranch(threadId);
-    return await git.squashAndMergeToBranch(parentBranch, commitMessage);
+    return await GitService.squashAndMergeToBranch(parentBranch, commitMessage);
   }
 } 
