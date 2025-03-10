@@ -3,7 +3,7 @@ import { CodeAgent } from '../agent/agent';
 import { GraphStateType } from '../agent/graphState';
 import * as vscode from 'vscode';
 import { LogService, LogLevel } from './logService';
-import { BaseMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
+import { BaseMessage, HumanMessage, SystemMessage, AIMessageChunk } from '@langchain/core/messages';
 import { GitService } from '../agent/utils/git';
 import { v4 as uuidv4 } from "uuid";
 
@@ -13,6 +13,10 @@ export class AgentService {
   private logService: LogService;
   private _onMessageReceived = new vscode.EventEmitter<BaseMessage>();
   public readonly onMessageReceived = this._onMessageReceived.event;
+  private _onMessageChunkReceived = new vscode.EventEmitter<{content: string, id: string}>();
+  public readonly onMessageChunkReceived = this._onMessageChunkReceived.event;
+  private _onToolEvent = new vscode.EventEmitter<{name: string, input?: any, output?: string}>();
+  public readonly onToolEvent = this._onToolEvent.event;
   
   constructor(logService: LogService) {
     this.logService = logService;
@@ -52,66 +56,97 @@ export class AgentService {
     // Emit the message for UI display
     this._onMessageReceived.fire(message);
     
-    // Patch the console.log function to use our logService
-    const originalConsoleLog = console.log;
-    console.log = (...args: any[]) => {
-      // Call the original console.log
-      originalConsoleLog(...args);
-      
-      // Convert args to string
-      const message = args.map(arg => 
-        typeof arg === 'object' ? JSON.stringify(arg, null, 2) : String(arg)
-      ).join(' ');
-      
-      // Determine log level based on message content
-      if (message.includes('[INTERNAL]') || message.includes('[THINKING]') || message.includes('[PUBLIC]')) {
-        // Already formatted by our logger, ignore to avoid duplication
-        return;
-      } else if (message.startsWith('```') || message.includes('diff --git')) {
-        // Code blocks or diffs are likely public output
-        this.logService.public(message);
-      } else if (
-        message.includes('agent messages:') || 
-        message.includes('msg:') || 
-        message.includes('commit_msg:') ||
-        message.includes('refined_response:')
-      ) {
-        // Agent thinking process
-        this.logService.thinking(message);
-      } else if (message.includes('selected_files:')) {
-        // File selection is useful for the user to see
-        this.logService.thinking(message);
-      } else if (message.includes('response:')) {
-        // LLM responses are important
-        this.logService.thinking(message);
-      } else if (message.includes('diff:')) {
-        // Diffs are important to show
-        this.logService.public(message);
-      } else {
-        // Default to internal logging
-        this.logService.internal(message);
-      }
-    };
-    
     try {
-      // Invoke the agent
-      const result = await this.agent.invoke(
-        prompt,
-        selectedFiles,
-        threadId
-      );
+      // Stream events from the agent execution
+      try {
+        for await (const event of this.agent.streamEvents(prompt, selectedFiles, threadId)) {
+          try {
+            // Handle different event types
+            if (event.event === "on_chat_model_start") {
+              // LLM is starting to generate
+              this.logService.internal(`LLM starting: ${event.name}`);
+            }
+            else if (event.event === "on_chat_model_stream") {
+              // This is a token from an LLM
+              if (event.data && event.data.chunk) {
+                const chunk = event.data.chunk;
+                // Emit the chunk for UI updates
+                this._onMessageChunkReceived.fire({
+                  content: typeof chunk.content === 'string' ? chunk.content : "",
+                  id: chunk.id || ""
+                });
+              }
+            }
+            else if (event.event === "on_chat_model_end") {
+              // LLM has finished generating
+              this.logService.internal(`LLM finished: ${event.name}`);
+            }
+            else if (event.event === "on_tool_start") {
+              // Tool is starting execution
+              if (event.data) {
+                this._onToolEvent.fire({
+                  name: event.data.name || "",
+                  input: event.data.input
+                });
+              }
+            }
+            else if (event.event === "on_tool_end") {
+              // Tool has finished execution
+              if (event.data) {
+                this._onToolEvent.fire({
+                  name: event.data.name || "",
+                  output: event.data.output
+                });
+              }
+            }
+            else if (event.event === "on_chain_start") {
+              // Node is starting execution
+              if (event.name !== "LangGraph" && event.name !== "__start__") {
+                this.logService.internal(`Starting node: ${event.name}`);
+              }
+            }
+            else if (event.event === "on_chain_end") {
+              // Node has finished execution
+              if (event.name !== "LangGraph" && event.name !== "__start__") {
+                this.logService.internal(`Finished node: ${event.name}`);
+              }
+            }
+            else if (event.event === "on_chain_stream") {
+              // Node has produced a partial result
+              if (event.name !== "LangGraph") {
+                this.logService.internal(`Node update: ${event.name}`);
+              }
+            }
+          } catch (eventError) {
+            // Log the error but continue processing events
+            this.logService.internal(`Error processing event: ${eventError}`);
+          }
+        }
+      } catch (streamError) {
+        // Log the streaming error but continue to get the final state
+        this.logService.internal(`Error streaming events: ${streamError}`);
+        
+        // If streaming fails, fall back to regular invoke
+        await this.agent.invoke(prompt, selectedFiles, threadId);
+      }
       
-      // Restore original console.log
-      console.log = originalConsoleLog;
+      // Get the final state
+      const result = await this.agent.getState(threadId);
+      
+      if (!result) {
+        throw new Error("Failed to get final state after agent execution");
+      }
       
       // If files were modified, generate diff, commit message, and commit the changes
       if (result.files_modified && result.files_modified.length > 0) {
         // Generate diff
         const diff = await this.generateDiff();
         
-        // Display diff
-        this.logService.public(`Changes made:`);
-        this.logService.diff(diff);
+        // Emit diff as a tool event
+        this._onToolEvent.fire({
+          name: 'diff',
+          output: diff
+        });
         
         // Commit changes
         const commitHash = await this.commitChanges(result, diff);
@@ -121,30 +156,15 @@ export class AgentService {
         result.commit_hash = commitHash;
       }
       
-      // Emit all new messages for UI display
-      if (result.messages) {
-        // Get the new messages (those added during this invocation)
-        const state = await this.agent.getState(threadId);
-        if (state && state.messages) {
-          // Emit each message that wasn't emitted before
-          // This is a simplified approach - in a real implementation,
-          // you'd need to track which messages have already been emitted
-          const newMessages = state.messages.slice(-2); // Assuming at most 2 new messages
-          for (const msg of newMessages) {
-            if (msg._getType() !== 'human') { // Don't re-emit the human message
-              this._onMessageReceived.fire(msg);
-            }
-          }
-        }
-      }
-      
       return result;
-    } catch (error) {
-      // Restore original console.log
-      console.log = originalConsoleLog;
-      
+    } catch (error: unknown) {
       // Log the error
       this.logService.internal(`Error invoking agent: ${error}`);
+      
+      // Emit an error message to the UI
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this._onMessageReceived.fire(new SystemMessage(`Error: ${errorMessage}`));
+      
       throw error;
     }
   }
@@ -205,7 +225,9 @@ export class AgentService {
     
     // Commit the changes
     const commitHash = await GitService.addAllAndCommit(commitMessage);
-    this.logService.public(`Changes committed with message: ${commitMessage}`);
+    
+    // Emit a message about the commit
+    this._onMessageReceived.fire(new SystemMessage(`Changes committed with message: ${commitMessage}`));
     
     return commitHash;
   }

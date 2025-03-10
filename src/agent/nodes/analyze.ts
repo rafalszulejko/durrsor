@@ -17,14 +17,15 @@ export const analyze = async (state: GraphStateType, logService: LogService) => 
   const config = vscode.workspace.getConfiguration('durrsor');
   const apiKey = config.get<string>('apiKey') || process.env.OPENAI_API_KEY || '';
   
-  // Initialize the model
+  // Initialize the model with streaming enabled
   const model = new ChatOpenAI({
     modelName: "gpt-4o",
     temperature: 0,
-    apiKey: apiKey
+    apiKey: apiKey,
+    streaming: true
   });
   
-  // Create the agent for context gathering
+  // Create the agent for context gathering with streaming enabled
   const tools = [createReadFileTool(logService)];
   const contextAgent = createReactAgent({
     llm: model,
@@ -38,7 +39,7 @@ export const analyze = async (state: GraphStateType, logService: LogService) => 
   const userMessages = state.messages.filter(msg => msg._getType() === 'human');
   const latestUserMessage = userMessages[userMessages.length - 1];
   
-  logService.thinking("Agent is analyzing the code context...");
+  logService.internal("Starting context analysis...");
   
   // Run the agent to gather context
   const agentResult = await contextAgent.invoke({
@@ -58,13 +59,13 @@ export const analyze = async (state: GraphStateType, logService: LogService) => 
       for (const call of msgAny.tool_calls) {
         if (!state.selected_files.includes(call.args.file_path)) {
           state.selected_files.push(call.args.file_path);
-          logService.thinking(`Adding file to context: ${call.args.file_path}`);
+          logService.internal(`Adding file to context: ${call.args.file_path}`);
         }
       }
     }
   }
 
-  logService.thinking(`Selected files for analysis: ${state.selected_files.join(', ')}`);
+  logService.internal(`Selected files for analysis: ${state.selected_files.join(', ')}`);
   const fileService = new FileService();
 
   // Read content of all selected files
@@ -79,9 +80,7 @@ export const analyze = async (state: GraphStateType, logService: LogService) => 
     }
   }
   
-  logService.internal(`gatheredContext:\n${gatheredContext}`);
-  
-  logService.thinking("Analyzing code to determine necessary changes...");
+  logService.internal("Analyzing code to determine necessary changes...");
   
   // Create system message for analysis
   const systemMessage = new SystemMessage(
@@ -103,12 +102,32 @@ Do not include specific code changes, line numbers or diffs, but full path must 
     new SystemMessage(`Based on this code context:\n\n${gatheredContext}\n\nWhat precise changes need to be made to which files?`)
   ];
   
-  // Get the refined response
-  const refinedResponse = await model.invoke(modelMessages);
+  // Get the refined response with streaming - use stream() to enable token-by-token streaming
+  const refinedResponseStream = await model.stream(modelMessages);
   
-  // Log the analysis results
-  logService.public(`Analysis complete. Determined changes needed:`);
-  logService.public(`${refinedResponse.content}`);
+  // Create a new AI message for the analysis
+  const refinedResponse = new AIMessage("");
+  let refinedContent = "";
+  
+  // Process the stream to collect the full response
+  try {
+    for await (const chunk of refinedResponseStream) {
+      if (chunk.content) {
+        refinedContent += chunk.content;
+      }
+    }
+    
+    // Set the final content
+    refinedResponse.content = refinedContent;
+  } catch (error) {
+    // If streaming fails, fall back to regular invoke
+    logService.internal(`Error streaming response: ${error}`);
+    const fallbackResponse = await model.invoke(modelMessages);
+    return {
+      code_context: gatheredContext,
+      messages: [...state.messages, fallbackResponse]
+    };
+  }
   
   // Return updated state with the AI message
   return {

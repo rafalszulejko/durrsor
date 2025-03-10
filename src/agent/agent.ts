@@ -69,6 +69,44 @@ export class CodeAgent {
   }
 
   /**
+   * Stream events from the agent execution.
+   * 
+   * @param content The user's message content
+   * @param selectedFiles List of files to include in the context
+   * @param threadId Thread ID for the conversation
+   * @returns An async iterable of events from the graph execution
+   */
+  async *streamEvents(
+    content: string,
+    selectedFiles: string[] = [],
+    threadId: string
+  ): AsyncIterable<any> {
+    // Create a human message from the content
+    const message = new HumanMessage(content);
+
+    // Set up the configuration with thread_id and stream mode
+    const config = { 
+      configurable: { thread_id: threadId },
+      streamMode: "messages", // Stream LLM tokens and other events
+      version: "v2" // Specify the schema version
+    };
+
+    // Initialize the input state
+    const inputState: Partial<GraphStateType> = {
+      messages: [message],
+      selected_files: selectedFiles,
+      thread_id: threadId
+    };
+
+    this.logService.internal(`Streaming agent with message: ${content}`);
+    this.logService.internal(`Selected files: ${selectedFiles}`);
+    this.logService.internal(`Thread ID: ${threadId}`);
+
+    // Stream events from the graph execution
+    yield* this.app.streamEvents(inputState, config);
+  }
+
+  /**
    * Get the current state for a thread.
    * 
    * @param threadId The thread ID

@@ -132,12 +132,50 @@ class DurrsorViewProvider implements vscode.WebviewViewProvider {
 		this._view?.webview.postMessage({ command: 'showLoading' });
 		
 		try {
+			// Set up event handlers for streaming
+			const messageHandler = this._agentService.onMessageReceived((message) => {
+				this._view?.webview.postMessage({
+					command: 'message',
+					message: message
+				});
+			});
+			
+			const chunkHandler = this._agentService.onMessageChunkReceived((chunk) => {
+				this._view?.webview.postMessage({
+					command: 'messageChunk',
+					chunk: chunk
+				});
+			});
+			
+			const toolHandler = this._agentService.onToolEvent((toolEvent) => {
+				// Create a tool message from the event
+				const toolMessage = {
+					type: 'tool',
+					content: toolEvent.output || JSON.stringify(toolEvent.input),
+					additional_kwargs: {
+						name: toolEvent.name,
+						input: toolEvent.input,
+						output: toolEvent.output
+					}
+				};
+				
+				this._view?.webview.postMessage({
+					command: 'message',
+					message: toolMessage
+				});
+			});
+			
 			// Invoke agent
 			const result = await this._agentService.processPrompt(
 				prompt,
 				selectedFiles,
 				this._previousState?.thread_id
 			);
+			
+			// Dispose of event handlers
+			messageHandler.dispose();
+			chunkHandler.dispose();
+			toolHandler.dispose();
 			
 			// Save state for next invocation
 			this._previousState = result;

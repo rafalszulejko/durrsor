@@ -21,16 +21,19 @@ export const generate = async (state: GraphStateType, logService: LogService) =>
   const config = vscode.workspace.getConfiguration('durrsor');
   const apiKey = config.get<string>('apiKey') || process.env.OPENAI_API_KEY || '';
   
-  // Initialize the model for the first LLM call
+  // Initialize the model for the first LLM call with streaming enabled
   const model = new ChatOpenAI({
     modelName: "gpt-4o",
     temperature: 0,
-    apiKey: apiKey
+    apiKey: apiKey,
+    streaming: true
   });
   
   // Get the analysis message (last AI message)
   const aiMessages = state.messages.filter(msg => msg._getType() === 'ai');
   const analysisMessage = aiMessages[aiMessages.length - 1];
+  
+  logService.internal("Generating code changes based on the analysis...");
   
   // Create system message for code generation
   const systemMessage = new SystemMessage(
@@ -44,9 +47,33 @@ export const generate = async (state: GraphStateType, logService: LogService) =>
     new SystemMessage(`Use the code context to implement the changes:\n\n${state.code_context}`)
   ];
   
-  // Make the LLM call
-  const response = await model.invoke(modelMessages);
-  logService.thinking(`Generated code changes:\n\`\`\`\n${response.content}\n\`\`\``);
+  // Make the LLM call with streaming
+  const responseStream = await model.stream(modelMessages);
+  
+  // Create a new AI message for the code generation
+  const response = new AIMessage("");
+  let responseContent = "";
+  
+  // Process the stream to collect the full response
+  try {
+    for await (const chunk of responseStream) {
+      if (chunk.content) {
+        responseContent += chunk.content;
+      }
+    }
+    
+    // Set the final content
+    response.content = responseContent;
+  } catch (error) {
+    // If streaming fails, fall back to regular invoke
+    logService.internal(`Error streaming response: ${error}`);
+    const fallbackResponse = await model.invoke(modelMessages);
+    response.content = typeof fallbackResponse.content === 'string' 
+      ? fallbackResponse.content 
+      : JSON.stringify(fallbackResponse.content);
+  }
+  
+  logService.internal("Applying code changes...");
 
   // Define the schema for edited files
   const editedFilesSchema = z.object({
@@ -62,7 +89,6 @@ export const generate = async (state: GraphStateType, logService: LogService) =>
     responseFormat: { type: "json_object", schema: editedFilesSchema }
   });
   
-  logService.thinking("Applying code changes...");
   // Run the agent with the LLM response
   const agentResult = await agent.invoke({
     messages: [{ role: "user", content: response.content }]
@@ -78,6 +104,7 @@ export const generate = async (state: GraphStateType, logService: LogService) =>
       const fileMatch = msg.content.match(/file `([^`]+)`/);
       if (fileMatch) {
         files_modified.push(fileMatch[1]);
+        logService.internal(`Modified file: ${fileMatch[1]}`);
       }
     }
   }
@@ -91,8 +118,7 @@ export const generate = async (state: GraphStateType, logService: LogService) =>
   
   // Get diff and create commit
   state.diff = await GitService.diff();
-  logService.public(`Changes made:`);
-  logService.diff(`${state.diff}`);
+  logService.internal(`Changes made to: ${state.files_modified.join(', ')}`);
   
   // Create a summary message
   const summaryMessage = new AIMessage(
@@ -105,6 +131,6 @@ export const generate = async (state: GraphStateType, logService: LogService) =>
   return {
     files_modified: state.files_modified,
     diff: state.diff,
-    messages: [...state.messages, summaryMessage]
+    messages: [...state.messages, response, summaryMessage]
   };
 }; 
