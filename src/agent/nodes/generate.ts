@@ -6,13 +6,14 @@ import { GitService } from "../utils/git";
 import { GraphStateType } from "../graphState";
 import * as vscode from 'vscode';
 import { LogService } from "../../services/logService";
+import { AIMessage, SystemMessage } from "@langchain/core/messages";
 
 /**
  * Generate node that:
- * 1. Makes LLM call with revised prompt and code context
+ * 1. Makes LLM call with analysis message and code context
  * 2. Uses agent to apply changes from LLM response
  * 
- * @param state Current graph state containing user prompt and code context
+ * @param state Current graph state containing messages and code context
  * @returns Updated state with modified files tracked
  */
 export const generate = async (state: GraphStateType, logService: LogService) => {
@@ -27,24 +28,24 @@ export const generate = async (state: GraphStateType, logService: LogService) =>
     apiKey: apiKey
   });
   
-  // Create messages array similar to the notebook example
-  const messages = [
-    {
-      role: "system", 
-      content: "You are an AI coding assistant. If asked, suggest code changes according to the best practices. Try formatting your code changes in unified diff format. Make sure every diff you make has only one header, you can split changes into multiple diffs if needed. Before every diff, include a little info about the file modified or created."
-    },
-    {
-      role: "user",
-      content: state.revised_prompt
-    },
-    {
-      role: "user",
-      content: state.code_context
-    }
+  // Get the analysis message (last AI message)
+  const aiMessages = state.messages.filter(msg => msg._getType() === 'ai');
+  const analysisMessage = aiMessages[aiMessages.length - 1];
+  
+  // Create system message for code generation
+  const systemMessage = new SystemMessage(
+    "You are an AI coding assistant. If asked, suggest code changes according to the best practices. Try formatting your code changes in unified diff format. Make sure every diff you make has only one header, you can split changes into multiple diffs if needed. Before every diff, include a little info about the file modified or created."
+  );
+  
+  // Create messages for the model - ONLY use the analysis message, not the entire history
+  const modelMessages = [
+    systemMessage,
+    analysisMessage, // Only include the analysis message (refined response)
+    new SystemMessage(`Use the code context to implement the changes:\n\n${state.code_context}`)
   ];
   
   // Make the LLM call
-  const response = await model.invoke(messages);
+  const response = await model.invoke(modelMessages);
   logService.thinking(`Generated code changes:\n\`\`\`\n${response.content}\n\`\`\``);
 
   // Define the schema for edited files
@@ -71,14 +72,12 @@ export const generate = async (state: GraphStateType, logService: LogService) =>
   const files_modified = [];
   
   for (const msg of agentResult.messages) {
-    // logService.thinking(`Agent action: ${typeof msg.content === 'string' ? msg.content.substring(0, 100) + '...' : 'Non-text content'}`);
     if (msg.content && typeof msg.content === 'string' && 
         msg.content.includes("Successfully applied diff to file")) {
       // Extract file path using regex
       const fileMatch = msg.content.match(/file `([^`]+)`/);
       if (fileMatch) {
         files_modified.push(fileMatch[1]);
-        // logService.public(`Modified file: ${fileMatch[1]}`);
       }
     }
   }
@@ -94,58 +93,18 @@ export const generate = async (state: GraphStateType, logService: LogService) =>
   state.diff = await GitService.diff();
   logService.public(`Changes made:`);
   logService.diff(`${state.diff}`);
-
-  logService.thinking("Generating commit message...");
-  const commitMsgResponse = await model.invoke([
-    { 
-      role: "system", 
-      content: "You are an expert at summarizing code changes. Summarize the changes made in the following diff." 
-    },
-    { 
-      role: "user", 
-      content: `Prompt: ${state.user_prompt}` 
-    },
-    { 
-      role: "user", 
-      content: `\`\`\`\n${state.diff}\n\`\`\`` 
-    }
-  ]);
   
-  logService.thinking(`Commit message: ${commitMsgResponse.content}`);
-  // Convert MessageContent to string
-  const commitMessage = typeof commitMsgResponse.content === 'string' 
-    ? commitMsgResponse.content 
-    : JSON.stringify(commitMsgResponse.content);
-  state.commit_hash = await GitService.addAllAndCommit(commitMessage);
-  logService.public(`Changes committed with message: ${commitMessage}`);
-
-  // Add a summary of changes to previous_changes
-  if (!state.conversation_data) {
-    state.conversation_data = {};
-  }
+  // Create a summary message
+  const summaryMessage = new AIMessage(
+    `Changes applied:\n\n` +
+    `Files modified: ${state.files_modified.join(', ')}\n\n` +
+    `${response.content}`
+  );
   
-  if (!state.conversation_data.previous_changes) {
-    state.conversation_data.previous_changes = [];
-  }
-  
-  const changeSummary = `User prompt:${state.user_prompt}\n\nChanged files:${state.files_modified}\n\nDiff:\n${state.diff}`;
-  state.conversation_data.previous_changes.push(changeSummary);
-
-  // Store a copy of the current state in past_states
-  if (!state.conversation_data.past_states) {
-    state.conversation_data.past_states = [];
-  }
-  
-  // Create a deep copy of the current state
-  const currentStateCopy = JSON.parse(JSON.stringify(state));
-  // Remove the conversation_data to avoid recursive storage
-  delete currentStateCopy.conversation_data;
-  state.conversation_data.past_states.push(currentStateCopy);
-  
+  // Return updated state with the new message
   return {
     files_modified: state.files_modified,
     diff: state.diff,
-    commit_hash: state.commit_hash,
-    conversation_data: state.conversation_data
+    messages: [...state.messages, summaryMessage]
   };
 }; 

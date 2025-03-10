@@ -1,22 +1,18 @@
 import { Annotation } from "@langchain/langgraph";
+import { MessagesAnnotation } from "@langchain/langgraph";
 
 /**
  * GraphState defines the state schema for the agent workflow graph.
- * This is converted from the Python TypedDict implementation to TypeScript
- * using LangGraph.js Annotation system.
+ * This extends MessagesAnnotation to leverage built-in message handling.
  */
 export const GraphState = Annotation.Root({
-  // User's original prompt/request
-  user_prompt: Annotation<string>(),
+  ...MessagesAnnotation.spec, // Include all message handling capabilities
   
   // List of files selected for the operation
   selected_files: Annotation<string[]>(),
   
   // Context extracted from the code
   code_context: Annotation<string>(),
-  
-  // Prompt after revision/refinement
-  revised_prompt: Annotation<string>(),
   
   // List of files that have been modified
   files_modified: Annotation<string[]>(),
@@ -32,12 +28,6 @@ export const GraphState = Annotation.Root({
   
   // Commit hash after changes are committed
   commit_hash: Annotation<string>(),
-  
-  // Optional conversation data
-  conversation_data: Annotation<Record<string, any> | null>({
-    value: (current, _) => current,
-    default: () => null,
-  }),
 });
 
 // Export the state type for use in nodes and edges

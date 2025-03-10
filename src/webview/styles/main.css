@@ -90,21 +90,60 @@ body {
   background-color: var(--vscode-button-hoverBackground);
 }
 
-/* Messages */
+/* Message types */
 .message {
-  margin-bottom: 16px;
-  padding: 12px;
-  border-radius: 8px;
+  margin-bottom: 8px;
 }
 
 .human-message {
   background-color: var(--vscode-input-background);
-  /* No border */
+  padding: 8px;
+  border-radius: 4px;
 }
 
 .ai-message {
-  padding: 0;
-  border-radius: 0;
+  padding: 4px 0;
+}
+
+.tool-message {
+  /* Minimal styling for tool messages */
+}
+
+.generic-message {
+  /* Minimal styling */
+}
+
+/* Log message styles - extremely minimal */
+.log-message {
+  font-size: 0.9em;
+  margin-bottom: 2px;
+  /* No background, no borders, no padding */
+}
+
+.thinking-log {
+  font-style: italic;
+  opacity: 0.8;
+}
+
+.public-log {
+  /* Just color difference */
+}
+
+.diff-log {
+  /* Just color difference */
+}
+
+.error-log {
+  color: var(--vscode-errorForeground);
+}
+
+/* Add minimal spacing for messages of a different type than the previous one */
+.log-message.new-log-type {
+  margin-top: 6px;
+}
+
+.message-content {
+  margin-top: 4px;
 }
 
 .files {
@@ -114,19 +153,51 @@ body {
   gap: 4px;
 }
 
-.response {
-  margin-top: 8px;
+/* Tool components */
+.tool-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 4px;
+  font-weight: bold;
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.9em;
 }
 
-.files-modified {
-  margin-top: 16px;
-  padding-top: 8px;
-  border-top: 1px solid var(--vscode-editorWidget-border);
+.tool-icon {
+  margin-right: 4px;
 }
 
-.files-modified ul {
-  margin: 8px 0 0 0;
-  padding-left: 20px;
+.tool-name {
+  font-size: 0.9em;
+}
+
+.tool-content {
+  margin-left: 8px;
+}
+
+.file-path {
+  font-family: var(--vscode-editor-font-family);
+  font-size: 0.9em;
+  color: var(--vscode-descriptionForeground);
+  margin-bottom: 4px;
+  padding: 2px 6px;
+  background-color: var(--vscode-editor-inactiveSelectionBackground);
+  border-radius: 3px;
+  display: inline-block;
+}
+
+.read-file-tool .file-content {
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 3px;
+  padding: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.edit-file-tool .edit-content {
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 3px;
+  padding: 8px;
 }
 
 /* Code blocks */
@@ -142,100 +213,13 @@ code {
   font-size: var(--vscode-editor-font-size);
 }
 
-/* Loading indicator */
-.loading-indicator {
-  display: flex;
-  align-items: center;
-  margin-top: 8px;
-  margin-bottom: 8px;
-  color: var(--vscode-descriptionForeground);
-}
-
-.loading-spinner {
-  width: 16px;
-  height: 16px;
-  margin-right: 8px;
-  border: 2px solid var(--vscode-descriptionForeground);
-  border-top-color: transparent;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-/* Log container and messages */
-.log-container {
-  display: flex;
-  flex-direction: column;
-  margin-bottom: 8px;
-}
-
-.log-message {
-  margin-bottom: 4px;
-}
-
-/* Add extra spacing for messages of a different type than the previous one */
-.log-message.new-log-type {
-  margin-top: 12px;
-}
-
-.log-message p {
-  margin: 0;
-  padding: 0;
-}
-
-.internal-message {
-  display: none; /* Internal messages are not displayed in the UI */
-}
-
-.thinking-message {
-  color: var(--vscode-descriptionForeground);
-  font-style: italic;
-  opacity: 0.8;
-}
-
-.public-message {
-  color: var(--vscode-foreground);
-}
-
-.diff-message {
-  color: var(--vscode-foreground);
-}
-
-.tool-message {
-  color: var(--vscode-foreground);
-}
-
-.error-message {
-  color: var(--vscode-errorForeground);
-}
-
+/* Diff container */
 .diff-container {
   margin: 4px 0;
   border: 1px solid var(--vscode-panel-border);
   border-radius: 3px;
   overflow: hidden;
-}
-
-.tool-container {
-  margin: 4px 0;
-  border: 1px solid var(--vscode-panel-border);
-  border-radius: 3px;
-  overflow: hidden;
-  padding: 4px 8px;
-  background-color: var(--vscode-editor-inactiveSelectionBackground);
-}
-
-.tool-name {
-  color: var(--vscode-descriptionForeground);
-  opacity: 0.8;
-  margin-right: 8px;
-}
-
-.tool-content {
-  display: inline;
+  max-width: 100%;
 }
 
 .diff-container pre {
@@ -261,12 +245,74 @@ code {
   color: #cb2431;
 }
 
-/* Remove old thinking and public sections */
-.thinking-section,
-.thinking-content,
-.thinking-message,
-.public-section,
-.public-content,
-.public-message {
-  /* These styles are kept for backward compatibility but will be replaced by the new log-message styles */
+/* Streaming message styles */
+.message[data-message-id] {
+  position: relative;
+}
+
+.message[data-message-id]::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: var(--vscode-activityBarBadge-background);
+  animation: pulse 1.5s infinite;
+  opacity: 0.7;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.8);
+    opacity: 0.7;
+  }
+}
+
+/* Remove streaming indicator when complete */
+.message:not([data-streaming])::after {
+  display: none;
+}
+
+/* Loading indicator */
+.loading-indicator {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  border-top: 1px solid var(--vscode-panel-border);
+  border-bottom: 1px solid var(--vscode-panel-border);
+  background-color: var(--vscode-editor-background);
+}
+
+.loading-indicator.visible {
+  display: flex;
+}
+
+.loading-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--vscode-activityBarBadge-background);
+  border-radius: 50%;
+  border-top-color: transparent;
+  animation: spin 1s linear infinite;
+  margin-right: 8px;
+}
+
+.loading-text {
+  color: var(--vscode-descriptionForeground);
+  font-style: italic;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 } 

@@ -25,10 +25,25 @@ class DurrsorViewProvider implements vscode.WebviewViewProvider {
 		this._logService.onLogMessage(({ level, message, isNewType }) => {
 			if (this._view) {
 				this._view.webview.postMessage({
-					command: 'logMessage',
+					command: 'log',
 					level,
 					message,
 					isNewType
+				});
+			}
+		});
+		
+		// Subscribe to messages from the agent service
+		this._agentService.onMessageReceived((message) => {
+			if (this._view) {
+				this._view.webview.postMessage({
+					command: 'message',
+					message: {
+						type: message._getType(),
+						content: message.content,
+						additional_kwargs: message.additional_kwargs || {},
+						id: message.id
+					}
 				});
 			}
 		});
@@ -79,6 +94,11 @@ class DurrsorViewProvider implements vscode.WebviewViewProvider {
 		<body>
 			<div class="chat-container" id="chatContainer"></div>
 			
+			<div class="loading-indicator" id="loadingIndicator">
+				<div class="loading-spinner"></div>
+				<div class="loading-text">Thinking...</div>
+			</div>
+			
 			<div class="input-container">
 				<div class="file-selector" id="fileSelector">
 					<button id="selectFilesButton">Select Files</button>
@@ -113,28 +133,23 @@ class DurrsorViewProvider implements vscode.WebviewViewProvider {
 		
 		try {
 			// Invoke agent
-			const result = await this._agentService.invokeAgent(
+			const result = await this._agentService.processPrompt(
 				prompt,
 				selectedFiles,
-				this._previousState
+				this._previousState?.thread_id
 			);
 			
 			// Save state for next invocation
 			this._previousState = result;
 			
-			// Send response to webview
-			this._view?.webview.postMessage({
-				command: 'agentResponse',
-				response: result.diff || 'No changes needed.',
-				files: result.files_modified || []
-			});
+			// Hide loading indicator
+			this._view?.webview.postMessage({ command: 'hideLoading' });
 		} catch (error: any) {
 			console.error('Error invoking agent:', error);
-			this._view?.webview.postMessage({
-				command: 'agentResponse',
-				response: `Error: ${error.message || 'An unknown error occurred'}`,
-				files: []
-			});
+			this._logService.error('extension', `Error: ${error.message || 'An unknown error occurred'}`);
+			
+			// Hide loading indicator
+			this._view?.webview.postMessage({ command: 'hideLoading' });
 		}
 	}
 
