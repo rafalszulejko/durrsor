@@ -121,7 +121,6 @@ export function createEditTool(logService: LogService): DynamicStructuredTool<an
       try {
         // Fix line numbers if the file exists
         diffContent = await fixDiffLineNumbers(filePath, diffContent);
-        logService.tool('Apply diff', `${filePath}`);
         
         // Apply the fixed diff
         const result = await applyDiff(filePath, diffContent, logService);

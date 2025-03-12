@@ -6,6 +6,7 @@ import { AgentService } from './services/agentService';
 import { FileService } from './services/fileService';
 import { GraphStateType } from './agent/graphState';
 import { LogService, LogLevel } from './services/logService';
+import { ToolMessage } from '@langchain/core/messages';
 
 // WebView provider class for the sidebar panel
 class DurrsorViewProvider implements vscode.WebviewViewProvider {
@@ -25,7 +26,7 @@ class DurrsorViewProvider implements vscode.WebviewViewProvider {
 		this._logService.onLogMessage(({ level, message, isNewType }) => {
 			if (this._view) {
 				this._view.webview.postMessage({
-					command: 'logMessage',
+					command: 'log',
 					level,
 					message,
 					isNewType
@@ -79,6 +80,11 @@ class DurrsorViewProvider implements vscode.WebviewViewProvider {
 		<body>
 			<div class="chat-container" id="chatContainer"></div>
 			
+			<div class="loading-indicator" id="loadingIndicator">
+				<div class="loading-spinner"></div>
+				<div class="loading-text">Thinking...</div>
+			</div>
+			
 			<div class="input-container">
 				<div class="file-selector" id="fileSelector">
 					<button id="selectFilesButton">Select Files</button>
@@ -112,29 +118,67 @@ class DurrsorViewProvider implements vscode.WebviewViewProvider {
 		this._view?.webview.postMessage({ command: 'showLoading' });
 		
 		try {
+			// Set up event handlers for streaming
+			const messageHandler = this._agentService.onMessageReceived((message) => {
+				// Extract essential data from the message object to avoid serialization issues
+				const messageData: {
+					type: string;
+					content: any;
+					name?: string;
+					additional_kwargs?: any;
+					id?: string;
+					tool_call_id?: string;
+				} = {
+					type: message._getType ? message._getType() : message.getType?.(),
+					content: message.content,
+					name: message.name,
+					additional_kwargs: message.additional_kwargs,
+					id: message.id
+				};
+				
+				// Add tool_call_id for ToolMessage objects
+				if (message instanceof ToolMessage) {
+					messageData.tool_call_id = message.tool_call_id;
+				}
+				
+				this._view?.webview.postMessage({
+					command: 'message',
+					messageData
+				});
+			});
+			
+			const chunkHandler = this._agentService.onMessageChunkReceived((chunk) => {
+				this._view?.webview.postMessage({
+					command: 'messageChunk',
+					chunkData: {
+						content: chunk.content,
+						id: chunk.id
+					}
+				});
+			});
+			
 			// Invoke agent
-			const result = await this._agentService.invokeAgent(
+			const result = await this._agentService.processPrompt(
 				prompt,
 				selectedFiles,
-				this._previousState
+				this._previousState?.thread_id
 			);
+			
+			// Dispose of event handlers
+			messageHandler.dispose();
+			chunkHandler.dispose();
 			
 			// Save state for next invocation
 			this._previousState = result;
 			
-			// Send response to webview
-			this._view?.webview.postMessage({
-				command: 'agentResponse',
-				response: result.diff || 'No changes needed.',
-				files: result.files_modified || []
-			});
+			// Hide loading indicator
+			this._view?.webview.postMessage({ command: 'hideLoading' });
 		} catch (error: any) {
 			console.error('Error invoking agent:', error);
-			this._view?.webview.postMessage({
-				command: 'agentResponse',
-				response: `Error: ${error.message || 'An unknown error occurred'}`,
-				files: []
-			});
+			this._logService.error('extension', `Error: ${error.message || 'An unknown error occurred'}`);
+			
+			// Hide loading indicator
+			this._view?.webview.postMessage({ command: 'hideLoading' });
 		}
 	}
 
