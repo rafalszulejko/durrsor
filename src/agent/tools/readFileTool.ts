@@ -69,7 +69,6 @@ export function createReadFileTool(logService: LogService): DynamicStructuredToo
     }),
     func: async ({ filePath }) => {
       try {
-        logService.tool('Read file', `${filePath}`);
         const result = await readFile(filePath, logService);
         return JSON.stringify(result);
       } catch (e) {

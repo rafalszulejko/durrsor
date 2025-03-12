@@ -3,7 +3,7 @@ import { CodeAgent } from '../agent/agent';
 import { GraphStateType } from '../agent/graphState';
 import * as vscode from 'vscode';
 import { LogService, LogLevel } from './logService';
-import { BaseMessage, HumanMessage, SystemMessage, AIMessageChunk } from '@langchain/core/messages';
+import { BaseMessage, HumanMessage, SystemMessage, AIMessageChunk, ToolMessage } from '@langchain/core/messages';
 import { GitService } from '../agent/utils/git';
 import { v4 as uuidv4 } from "uuid";
 
@@ -15,8 +15,6 @@ export class AgentService {
   public readonly onMessageReceived = this._onMessageReceived.event;
   private _onMessageChunkReceived = new vscode.EventEmitter<{content: string, id: string}>();
   public readonly onMessageChunkReceived = this._onMessageChunkReceived.event;
-  private _onToolEvent = new vscode.EventEmitter<{name: string, input?: any, output?: string}>();
-  public readonly onToolEvent = this._onToolEvent.event;
   
   constructor(logService: LogService) {
     this.logService = logService;
@@ -81,23 +79,20 @@ export class AgentService {
               // LLM has finished generating
               this.logService.internal(`LLM finished: ${event.name}`);
             }
-            else if (event.event === "on_tool_start") {
-              // Tool is starting execution
-              if (event.data) {
-                this._onToolEvent.fire({
-                  name: event.data.name || "",
-                  input: event.data.input
-                });
-              }
-            }
             else if (event.event === "on_tool_end") {
               // Tool has finished execution
-              if (event.data) {
-                this._onToolEvent.fire({
-                  name: event.data.name || "",
-                  output: event.data.output
+              const kwargs = event.data.output.lc_kwargs;
+              console.log('[agentService.ts on_tool_end, kwargs]', JSON.stringify(kwargs, null, 2));
+              const toolMessage = new ToolMessage({
+                content: event.data.output.lc_kwargs.content,
+                tool_call_id: event.data.output.lc_kwargs.tool_call_id,
+                name: event.data.output.lc_kwargs.name,
+                additional_kwargs: event.data.output.lc_kwargs.additional_kwargs,
+                response_metadata: event.data.output.lc_kwargs.response_metadata
                 });
-              }
+                console.log('[agentService.ts on_tool_end, toolMessage]', JSON.stringify(toolMessage, null, 2));
+                this._onMessageReceived.fire(toolMessage);
+              
             }
             else if (event.event === "on_chain_start") {
               // Node is starting execution
@@ -141,12 +136,6 @@ export class AgentService {
       if (result.files_modified && result.files_modified.length > 0) {
         // Generate diff
         const diff = await this.generateDiff();
-        
-        // Emit diff as a tool event
-        this._onToolEvent.fire({
-          name: 'diff',
-          output: diff
-        });
         
         // Commit changes
         const commitHash = await this.commitChanges(result, diff);

@@ -105,8 +105,25 @@ body {
   padding: 4px 0;
 }
 
+/* Tool message specific styling */
 .tool-message {
-  /* Minimal styling for tool messages */
+  margin: 4px 0;
+}
+
+.read-file-tool, .edit-file-tool {
+  margin: 8px 0;
+}
+
+.tool-frame .tool-name {
+  color: var(--vscode-descriptionForeground);
+}
+
+.tool-frame .file-path {
+  color: var(--vscode-foreground);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 60%;
 }
 
 .generic-message {
@@ -169,10 +186,34 @@ body {
 
 .tool-name {
   font-size: 0.9em;
+  font-weight: 500;
+  margin-right: 8px;
 }
 
 .tool-content {
   margin-left: 8px;
+}
+
+/* New tool frame styling */
+.tool-frame {
+  display: flex;
+  align-items: center;
+  background-color: var(--vscode-editor-background);
+  border: 1px solid var(--vscode-panel-border, var(--vscode-editor-lineHighlightBorder, #303030));
+  border-radius: 3px;
+  padding: 4px 8px;
+  margin: 4px 0;
+}
+
+.tool-frame .file-path {
+  flex: 1;
+  margin: 0 8px;
+  padding: 0;
+  background: none;
+}
+
+.tool-frame .tool-status {
+  margin-left: auto;
 }
 
 .file-path {

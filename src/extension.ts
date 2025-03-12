@@ -6,6 +6,7 @@ import { AgentService } from './services/agentService';
 import { FileService } from './services/fileService';
 import { GraphStateType } from './agent/graphState';
 import { LogService, LogLevel } from './services/logService';
+import { ToolMessage } from '@langchain/core/messages';
 
 // WebView provider class for the sidebar panel
 class DurrsorViewProvider implements vscode.WebviewViewProvider {
@@ -36,14 +37,19 @@ class DurrsorViewProvider implements vscode.WebviewViewProvider {
 		// Subscribe to messages from the agent service
 		this._agentService.onMessageReceived((message) => {
 			if (this._view) {
+				console.log('[extension.ts onMessageReceived]', JSON.stringify(message, null, 2));
+				// Extract essential data from the message object to avoid serialization issues
+				const messageData = {
+					type: message._getType ? message._getType() : message.getType?.(),
+					content: message.content,
+					name: message.name,
+					additional_kwargs: message.additional_kwargs,
+					id: message.id
+				};
+				
 				this._view.webview.postMessage({
 					command: 'message',
-					message: {
-						type: message._getType(),
-						content: message.content,
-						additional_kwargs: message.additional_kwargs || {},
-						id: message.id
-					}
+					messageData
 				});
 			}
 		});
@@ -134,6 +140,7 @@ class DurrsorViewProvider implements vscode.WebviewViewProvider {
 		try {
 			// Set up event handlers for streaming
 			const messageHandler = this._agentService.onMessageReceived((message) => {
+				console.log('[extension.ts _handlePrompt, messageHandler]', JSON.stringify(message, null, 2));
 				this._view?.webview.postMessage({
 					command: 'message',
 					message: message
@@ -143,25 +150,10 @@ class DurrsorViewProvider implements vscode.WebviewViewProvider {
 			const chunkHandler = this._agentService.onMessageChunkReceived((chunk) => {
 				this._view?.webview.postMessage({
 					command: 'messageChunk',
-					chunk: chunk
-				});
-			});
-			
-			const toolHandler = this._agentService.onToolEvent((toolEvent) => {
-				// Create a tool message from the event
-				const toolMessage = {
-					type: 'tool',
-					content: toolEvent.output || JSON.stringify(toolEvent.input),
-					additional_kwargs: {
-						name: toolEvent.name,
-						input: toolEvent.input,
-						output: toolEvent.output
+					chunkData: {
+						content: chunk.content,
+						id: chunk.id
 					}
-				};
-				
-				this._view?.webview.postMessage({
-					command: 'message',
-					message: toolMessage
 				});
 			});
 			
@@ -175,7 +167,6 @@ class DurrsorViewProvider implements vscode.WebviewViewProvider {
 			// Dispose of event handlers
 			messageHandler.dispose();
 			chunkHandler.dispose();
-			toolHandler.dispose();
 			
 			// Save state for next invocation
 			this._previousState = result;

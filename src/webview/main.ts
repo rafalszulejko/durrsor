@@ -3,6 +3,20 @@ import MarkdownIt from 'markdown-it';
 import hljs from 'highlight.js';
 import 'highlight.js/styles/github.css';
 import 'highlight.js/styles/vs2015.css';
+import { 
+  BaseMessage, 
+  HumanMessage, 
+  AIMessage, 
+  SystemMessage, 
+  ToolMessage, 
+  AIMessageChunk 
+} from '@langchain/core/messages';
+import { 
+  isAIMessage, 
+  isHumanMessage, 
+  isToolMessage, 
+  isSystemMessage 
+} from '@langchain/core/messages';
 
 // Declare the VS Code API
 declare function acquireVsCodeApi(): {
@@ -10,21 +24,6 @@ declare function acquireVsCodeApi(): {
   getState(): any;
   setState(state: any): void;
 };
-
-// Message types from LangChain
-type MessageType = 'human' | 'ai' | 'tool';
-
-// Message interface
-interface Message {
-  type: MessageType;
-  content: string;
-  id?: string;
-  additional_kwargs?: {
-    tool_call_id?: string;
-    name?: string;
-    [key: string]: any;
-  };
-}
 
 // Message chunk interface
 interface MessageChunk {
@@ -95,10 +94,23 @@ interface Log {
     
     switch (message.command) {
       case 'message':
-        handleMessage(message.message);
+        if (message.messageData) {
+          // Reconstruct the proper message class instance
+          console.log('[main.ts message]', JSON.stringify(message.messageData, null, 2));
+          const reconstructedMessage = reconstructMessage(message.messageData);
+          handleMessage(reconstructedMessage);
+        } else if (message.message) {
+          // Fallback for backward compatibility
+          handleMessage(message.message);
+        }
         break;
       case 'messageChunk':
-        handleMessageChunk(message.chunk);
+        if (message.chunkData) {
+          handleMessageChunk(message.chunkData);
+        } else if (message.chunk) {
+          // Fallback for backward compatibility
+          handleMessageChunk(message.chunk);
+        }
         break;
       case 'log':
         handleLog(message.level, message.message, message.isNewType);
@@ -137,15 +149,17 @@ interface Log {
     promptInput.value = '';
   }
   
-  function handleMessage(message: Message) {
+  function handleMessage(message: BaseMessage) {
+    console.log('[main.ts handleMessage] but earlier', JSON.stringify(message, null, 2));
+
     // For AI messages that are being streamed, we may already have a placeholder element
-    if (message.type === 'ai' && message.id && streamingMessages.has(message.id)) {
+    if (isAIMessage(message) && message.id && streamingMessages.has(message.id)) {
       // The message is complete, but we've already been rendering it via chunks
       // Just ensure it's fully up to date
       const existingElement = streamingMessages.get(message.id)!;
       const contentElement = existingElement.querySelector('.message-content');
       if (contentElement) {
-        contentElement.innerHTML = md.render(message.content);
+        contentElement.innerHTML = md.render(String(message.content));
       }
       
       // Remove from streaming messages map
@@ -155,33 +169,38 @@ interface Log {
     
     // Create the appropriate component based on message type
     let messageComponent;
-    
-    switch (message.type) {
-      case 'human':
-        messageComponent = new HumanMessageComponent(message, selectedFiles);
-        break;
-      case 'ai':
-        messageComponent = new AIMessageComponent(message);
-        break;
-      case 'tool':
-        // Determine which tool component to use based on the tool name
-        const toolName = message.additional_kwargs?.name || 'generic';
-        
-        switch (toolName) {
-          case 'read_file':
-            messageComponent = new ReadFileToolComponent(message);
-            break;
-          case 'edit_file':
-            messageComponent = new EditFileToolComponent(message);
-            break;
-          default:
-            messageComponent = new GenericToolComponent(message);
-            break;
-        }
-        break;
-      default:
-        // Fallback for unknown message types
-        messageComponent = new GenericMessageComponent(message);
+    console.log('[main.ts handleMessage]', JSON.stringify(message, null, 2));
+    console.log(`message instanceof humanMessage: ${message instanceof HumanMessage}`);
+    if (isHumanMessage(message)) {
+      messageComponent = new HumanMessageComponent(message, selectedFiles);
+    } 
+    else if (isAIMessage(message)) {
+      messageComponent = new AIMessageComponent(message);
+    }
+    else if (isToolMessage(message)) {
+      // Determine which tool component to use based on the tool name
+      // Access tool_call_id which is guaranteed to exist on ToolMessage
+      const toolMessage = message as ToolMessage;
+      const toolName = toolMessage.name || 'generic';
+      
+      switch (toolName) {
+        case 'read_file_tool':
+          messageComponent = new ReadFileToolComponent(message);
+          break;
+        case 'edit_tool':
+          messageComponent = new EditFileToolComponent(message);
+          break;
+        default:
+          messageComponent = new GenericToolComponent(message);
+          break;
+      }
+    }
+    else if (isSystemMessage(message)) {
+      messageComponent = new GenericMessageComponent(message);
+    }
+    else {
+      // Default case for any other message types
+      messageComponent = new GenericMessageComponent(message);
     }
     
     // Render the component and add it to the chat container
@@ -194,11 +213,10 @@ interface Log {
     // If this is the first chunk for this message, create a new message element
     if (!streamingMessages.has(chunk.id)) {
       // Create a new AI message component with empty content
-      const message: Message = {
-        type: 'ai',
+      const message = new AIMessage({
         content: '',
         id: chunk.id
-      };
+      });
       
       const messageComponent = new AIMessageComponent(message);
       const element = messageComponent.render();
@@ -210,22 +228,24 @@ interface Log {
       streamingMessages.set(chunk.id, element);
     }
     
-    // Get the existing message element
-    const element = streamingMessages.get(chunk.id)!;
+    // Update the existing message with the new chunk content
+    const existingElement = streamingMessages.get(chunk.id)!;
+    const contentElement = existingElement.querySelector('.message-content');
     
-    // Find the content element
-    const contentElement = element.querySelector('.message-content');
     if (contentElement) {
       // Append the new content
       const currentContent = contentElement.getAttribute('data-raw-content') || '';
       const newContent = currentContent + chunk.content;
       
-      // Store the raw content for future updates
+      // Update the raw content attribute
       contentElement.setAttribute('data-raw-content', newContent);
       
-      // Render the markdown
+      // Update the rendered content
       contentElement.innerHTML = md.render(newContent);
     }
+    
+    // Mark the message as streaming
+    existingElement.setAttribute('data-streaming', 'true');
     
     scrollToBottom();
   }
@@ -293,9 +313,9 @@ interface Log {
   
   // Base Message Component
   class MessageComponent {
-    protected message: Message;
+    protected message: BaseMessage;
     
-    constructor(message: Message) {
+    constructor(message: BaseMessage) {
       this.message = message;
     }
     
@@ -320,7 +340,7 @@ interface Log {
   class HumanMessageComponent extends MessageComponent {
     private selectedFiles: string[];
     
-    constructor(message: Message, selectedFiles: string[]) {
+    constructor(message: HumanMessage, selectedFiles: string[]) {
       super(message);
       this.selectedFiles = selectedFiles;
     }
@@ -331,7 +351,7 @@ interface Log {
       
       const contentElement = document.createElement('div');
       contentElement.className = 'message-content';
-      contentElement.textContent = this.message.content;
+      contentElement.textContent = String(this.message.content);
       
       element.appendChild(contentElement);
       
@@ -369,10 +389,10 @@ interface Log {
       contentElement.className = 'message-content';
       
       // Store the raw content for streaming updates
-      contentElement.setAttribute('data-raw-content', this.message.content);
+      contentElement.setAttribute('data-raw-content', String(this.message.content));
       
       // Render the content
-      contentElement.innerHTML = this.renderMarkdown(this.message.content);
+      contentElement.innerHTML = this.renderMarkdown(String(this.message.content));
       
       element.appendChild(contentElement);
       
@@ -446,32 +466,43 @@ interface Log {
       const element = document.createElement('div');
       element.className = 'message tool-message read-file-tool';
       
-      const headerElement = document.createElement('div');
-      headerElement.className = 'tool-header';
-      headerElement.innerHTML = `<span class="tool-icon">📄</span> <span class="tool-name">Read File</span>`;
+      // Parse the content as JSON
+      let filePath = 'Unknown file';
+      let success = false;
       
-      const contentElement = document.createElement('div');
-      contentElement.className = 'tool-content';
+      try {
+        const contentObj = JSON.parse(String(this.message.content));
+        filePath = contentObj.filePath || 'Unknown file';
+        success = Boolean(contentObj.success);
+      } catch (e) {
+        console.error('Failed to parse ReadFileToolComponent content as JSON', e);
+      }
       
-      // Extract file path if available
-      const filePath = this.message.additional_kwargs?.file_path || 
-                      this.message.additional_kwargs?.arguments?.file_path || 
-                      'Unknown file';
+      // Create a single row frame
+      const frameElement = document.createElement('div');
+      frameElement.className = 'tool-frame';
       
-      const filePathElement = document.createElement('div');
+      // Add tool name
+      const toolNameElement = document.createElement('span');
+      toolNameElement.className = 'tool-name';
+      toolNameElement.textContent = 'Read file';
+      
+      // Add file path
+      const filePathElement = document.createElement('span');
       filePathElement.className = 'file-path';
       filePathElement.textContent = filePath;
       
-      // Render content
-      const fileContentElement = document.createElement('div');
-      fileContentElement.className = 'file-content';
-      fileContentElement.innerHTML = this.renderMarkdown(this.message.content);
+      // Add success/failure icon
+      const statusElement = document.createElement('span');
+      statusElement.className = 'tool-status';
+      statusElement.innerHTML = success ? '✓' : '𐄂';
       
-      contentElement.appendChild(filePathElement);
-      contentElement.appendChild(fileContentElement);
+      // Assemble the frame
+      frameElement.appendChild(toolNameElement);
+      frameElement.appendChild(filePathElement);
+      frameElement.appendChild(statusElement);
       
-      element.appendChild(headerElement);
-      element.appendChild(contentElement);
+      element.appendChild(frameElement);
       
       return element;
     }
@@ -483,32 +514,43 @@ interface Log {
       const element = document.createElement('div');
       element.className = 'message tool-message edit-file-tool';
       
-      const headerElement = document.createElement('div');
-      headerElement.className = 'tool-header';
-      headerElement.innerHTML = `<span class="tool-icon">✏️</span> <span class="tool-name">Edit File</span>`;
+      // Parse the content as JSON
+      let filePath = 'Unknown file';
+      let success = false;
       
-      const contentElement = document.createElement('div');
-      contentElement.className = 'tool-content';
+      try {
+        const contentObj = JSON.parse(String(this.message.content));
+        filePath = contentObj.filePath || 'Unknown file';
+        success = Boolean(contentObj.success);
+      } catch (e) {
+        console.error('Failed to parse EditFileToolComponent content as JSON', e);
+      }
       
-      // Extract file path if available
-      const filePath = this.message.additional_kwargs?.file_path || 
-                      this.message.additional_kwargs?.arguments?.file_path || 
-                      'Unknown file';
+      // Create a single row frame
+      const frameElement = document.createElement('div');
+      frameElement.className = 'tool-frame';
       
-      const filePathElement = document.createElement('div');
+      // Add tool name
+      const toolNameElement = document.createElement('span');
+      toolNameElement.className = 'tool-name';
+      toolNameElement.textContent = 'Applying diff';
+      
+      // Add file path
+      const filePathElement = document.createElement('span');
       filePathElement.className = 'file-path';
       filePathElement.textContent = filePath;
       
-      // Render content
-      const editContentElement = document.createElement('div');
-      editContentElement.className = 'edit-content';
-      editContentElement.innerHTML = this.renderMarkdown(this.message.content);
+      // Add success/failure icon
+      const statusElement = document.createElement('span');
+      statusElement.className = 'tool-status';
+      statusElement.innerHTML = success ? '✓' : '𐄂';
       
-      contentElement.appendChild(filePathElement);
-      contentElement.appendChild(editContentElement);
+      // Assemble the frame
+      frameElement.appendChild(toolNameElement);
+      frameElement.appendChild(filePathElement);
+      frameElement.appendChild(statusElement);
       
-      element.appendChild(headerElement);
-      element.appendChild(contentElement);
+      element.appendChild(frameElement);
       
       return element;
     }
@@ -518,9 +560,10 @@ interface Log {
   class GenericToolComponent extends MessageComponent {
     render(): HTMLElement {
       const element = document.createElement('div');
-      element.className = 'message tool-message';
+      element.className = 'message tool-message generic-tool';
       
-      const toolName = this.message.additional_kwargs?.name || 'Tool';
+      const toolMessage = this.message as ToolMessage;
+      const toolName = toolMessage.name || 'Tool';
       
       const headerElement = document.createElement('div');
       headerElement.className = 'tool-header';
@@ -528,13 +571,7 @@ interface Log {
       
       const contentElement = document.createElement('div');
       contentElement.className = 'tool-content';
-      
-      // Render content
-      if (this.message.content.includes('```')) {
-        contentElement.innerHTML = this.renderMarkdown(this.message.content);
-      } else {
-        contentElement.textContent = this.message.content;
-      }
+      contentElement.innerHTML = this.renderMarkdown(String(this.message.content));
       
       element.appendChild(headerElement);
       element.appendChild(contentElement);
@@ -543,19 +580,47 @@ interface Log {
     }
   }
   
-  // Generic Message Component (fallback)
+  // Generic Message Component (for system messages and other types)
   class GenericMessageComponent extends MessageComponent {
     render(): HTMLElement {
       const element = document.createElement('div');
       element.className = 'message generic-message';
       
+      // Add message type as a class
+      if (isSystemMessage(this.message)) {
+        element.classList.add('system-message');
+      }
+      
       const contentElement = document.createElement('div');
       contentElement.className = 'message-content';
-      contentElement.textContent = this.message.content;
+      contentElement.innerHTML = this.renderMarkdown(String(this.message.content));
       
       element.appendChild(contentElement);
       
       return element;
+    }
+  }
+  
+  // Function to reconstruct message class instances from serialized data
+  function reconstructMessage(messageData: any): BaseMessage {
+    const { type, content, name, additional_kwargs, id } = messageData;
+    console.log('[main.ts reconstructMessage]', JSON.stringify(messageData, null, 2));
+    
+    switch(type) {
+      case 'human': 
+        return new HumanMessage({ content, name, additional_kwargs, id });
+      case 'ai': 
+        return new AIMessage({ content, name, additional_kwargs, id });
+      case 'system': 
+        return new SystemMessage({ content, name, additional_kwargs, id });
+      case 'tool': 
+        return new ToolMessage(messageData);
+      case 'ai_chunk':
+        return new AIMessageChunk({ content, name, additional_kwargs, id });
+      default: 
+        console.warn(`Unknown message type: ${type}`);
+        // Create a generic BaseMessage for unknown types
+        return new HumanMessage({ content, name: name || type, additional_kwargs, id });
     }
   }
 })(); 
