@@ -120,7 +120,6 @@ class DurrsorViewProvider implements vscode.WebviewViewProvider {
 		try {
 			// Set up event handlers for streaming
 			const messageHandler = this._agentService.onMessageReceived((message) => {
-				console.log('[extension.ts _handlePrompt, messageHandler]', JSON.stringify(message, null, 2));
 				// Extract essential data from the message object to avoid serialization issues
 				const messageData: {
 					type: string;

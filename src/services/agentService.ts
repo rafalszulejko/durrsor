@@ -83,7 +83,6 @@ export class AgentService {
             else if (event.event === "on_tool_end") {
               // Tool has finished execution
               const kwargs = event.data.output.lc_kwargs;
-              console.log('[agentService.ts on_tool_end, kwargs]', JSON.stringify(kwargs, null, 2));
               const toolMessage = new ToolMessage({
                 content: event.data.output.lc_kwargs.content,
                 tool_call_id: event.data.output.lc_kwargs.tool_call_id,
@@ -91,7 +90,6 @@ export class AgentService {
                 additional_kwargs: event.data.output.lc_kwargs.additional_kwargs,
                 response_metadata: event.data.output.lc_kwargs.response_metadata
                 });
-                console.log('[agentService.ts on_tool_end, toolMessage]', JSON.stringify(toolMessage, null, 2));
                 this._onMessageReceived.fire(toolMessage);
               
             }

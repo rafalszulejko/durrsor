@@ -107,7 +107,6 @@ interface Log {
       case 'message':
         if (message.messageData) {
           // Reconstruct the proper message class instance
-          console.log('[main.ts message]', JSON.stringify(message.messageData, null, 2));
           const reconstructedMessage = reconstructMessage(message.messageData);
           handleMessage(reconstructedMessage);
         }
@@ -155,7 +154,6 @@ interface Log {
   }
   
   function handleMessage(message: BaseMessage) {
-    console.log('[main.ts handleMessage] but earlier', JSON.stringify(message, null, 2));
 
     // For AI messages that are being streamed, we may already have a placeholder element
     if (isAIMessage(message) && message.id && streamingMessages.has(message.id)) {
@@ -174,8 +172,6 @@ interface Log {
     
     // Create the appropriate component based on message type
     let messageComponent;
-    console.log('[main.ts handleMessage]', JSON.stringify(message, null, 2));
-    console.log(`message instanceof humanMessage: ${message instanceof HumanMessage}`);
     if (isHumanMessage(message)) {
       messageComponent = new HumanMessageComponent(message, selectedFiles);
     } 
@@ -317,7 +313,6 @@ interface Log {
   // Function to reconstruct message class instances from serialized data
   function reconstructMessage(messageData: any): BaseMessage {
     const { type, content, name, additional_kwargs, id, tool_call_id } = messageData;
-    console.log('[main.ts reconstructMessage]', JSON.stringify(messageData, null, 2));
     
     switch(type) {
       case 'human': 
