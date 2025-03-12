@@ -45,7 +45,8 @@ export class AgentService {
     if (!threadId) {
       threadId = uuidv4();
       // Create new branch for this thread
-      await this.createBranch(threadId);
+      this.logService.internal(`Creating branch for thread: ${threadId}`);
+      await GitService.createAndCheckoutBranch(threadId);
     }
     
     // Create a human message
@@ -135,7 +136,7 @@ export class AgentService {
       // If files were modified, generate diff, commit message, and commit the changes
       if (result.files_modified && result.files_modified.length > 0) {
         // Generate diff
-        const diff = await this.generateDiff();
+        const diff = await GitService.diff();
         
         // Commit changes
         const commitHash = await this.commitChanges(result, diff);
@@ -156,25 +157,6 @@ export class AgentService {
       
       throw error;
     }
-  }
-  
-  /**
-   * Create a new Git branch for a thread
-   * 
-   * @param threadId The thread ID
-   */
-  private async createBranch(threadId: string): Promise<void> {
-    this.logService.internal(`Creating branch for thread: ${threadId}`);
-    await GitService.createAndCheckoutBranch(threadId);
-  }
-  
-  /**
-   * Generate a diff of the current changes
-   * 
-   * @returns The diff as a string
-   */
-  private async generateDiff(): Promise<string> {
-    return await GitService.diff();
   }
   
   /**
@@ -222,37 +204,6 @@ export class AgentService {
   }
   
   /**
-   * Get the current state for a thread
-   * 
-   * @param threadId The thread ID
-   * @returns The current state for the thread
-   */
-  async getState(threadId: string): Promise<GraphStateType | null> {
-    return await this.agent.getState(threadId);
-  }
-  
-  /**
-   * Get the history of states for a thread
-   * 
-   * @param threadId The thread ID
-   * @returns The history of states for the thread
-   */
-  async getStateHistory(threadId: string): Promise<GraphStateType[]> {
-    return await this.agent.getStateHistory(threadId);
-  }
-  
-  /**
-   * Get the parent branch for a thread.
-   * 
-   * @param threadId The thread ID
-   * @returns The parent branch name
-   */
-  async getParentBranch(threadId: string): Promise<string> {
-    const currentBranch = await GitService.getCurrentBranch();
-    return currentBranch.replace(`durrsor-${threadId}`, '');
-  }
-  
-  /**
    * Squash and merge changes from a thread branch to the parent branch.
    * 
    * @param threadId The thread ID
@@ -260,20 +211,8 @@ export class AgentService {
    * @returns Result of the squash merge operation
    */
   async squashAndMergeToParent(threadId: string, commitMessage?: string): Promise<string> {
-    const parentBranch = await this.getParentBranch(threadId);
+    const currentBranch = await GitService.getCurrentBranch();
+    const parentBranch = currentBranch.replace(`durrsor-${threadId}`, '');
     return await GitService.squashAndMergeToBranch(parentBranch, commitMessage);
-  }
-  
-  /**
-   * Legacy method for backward compatibility
-   * @deprecated Use processPrompt instead
-   */
-  async invokeAgent(
-    prompt: string,
-    selectedFiles: string[],
-    previousState?: GraphStateType
-  ): Promise<GraphStateType> {
-    const threadId = previousState?.thread_id || uuidv4();
-    return this.processPrompt(prompt, selectedFiles, threadId);
   }
 } 
