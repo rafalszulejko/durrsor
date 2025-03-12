@@ -1,36 +1,22 @@
 // Import required libraries
-import MarkdownIt from 'markdown-it';
+import {
+  AIMessage,
+  BaseMessage,
+  isAIMessage
+} from '@langchain/core/messages';
 import hljs from 'highlight.js';
 import 'highlight.js/styles/github.css';
 import 'highlight.js/styles/vs2015.css';
-import { 
-  BaseMessage, 
-  HumanMessage, 
-  AIMessage, 
-  SystemMessage, 
-  ToolMessage, 
-  AIMessageChunk 
-} from '@langchain/core/messages';
-import { 
-  isAIMessage, 
-  isHumanMessage, 
-  isToolMessage, 
-  isSystemMessage 
-} from '@langchain/core/messages';
+import MarkdownIt from 'markdown-it';
 
 // Import components
 import {
-  HumanMessageComponent,
   AIMessageComponent,
-  GenericMessageComponent,
-  GenericToolComponent,
-  EditFileToolComponent,
-  ReadFileToolComponent,
   LogMessageComponent
 } from './components';
 
 // Import utils
-import { reconstructMessage } from './utils';
+import { getComponentForMessage, reconstructMessage } from './utils';
 
 // Declare the VS Code API
 declare function acquireVsCodeApi(): {
@@ -173,43 +159,8 @@ interface Log {
       return;
     }
     
-    // Create the appropriate component based on message type
-    let messageComponent;
-    if (isHumanMessage(message)) {
-      messageComponent = new HumanMessageComponent(message, selectedFiles);
-    } 
-    else if (isAIMessage(message)) {
-      messageComponent = new AIMessageComponent(message);
-    }
-    else if (isToolMessage(message)) {
-      // Determine which tool component to use based on the tool name
-      // Access tool_call_id which is guaranteed to exist on ToolMessage
-      const toolMessage = message as ToolMessage;
-      const toolName = toolMessage.name || 'generic';
-      
-      switch (toolName) {
-        case 'read_file_tool':
-          messageComponent = new ReadFileToolComponent(message);
-          break;
-        case 'edit_tool':
-          messageComponent = new EditFileToolComponent(message);
-          break;
-        default:
-          messageComponent = new GenericToolComponent(message);
-          break;
-      }
-    }
-    else if (isSystemMessage(message)) {
-      messageComponent = new GenericMessageComponent(message);
-    }
-    else {
-      // Default case for any other message types
-      messageComponent = new GenericMessageComponent(message);
-    }
-    
-    // Render the component and add it to the chat container
-    const element = messageComponent.render();
-    chatContainer?.appendChild(element);
+    // Create component, render it, and add to chat container in one step
+    chatContainer?.appendChild(getComponentForMessage(message, selectedFiles).render());
     scrollToBottom();
   }
   
