@@ -110,17 +110,11 @@ interface Log {
           console.log('[main.ts message]', JSON.stringify(message.messageData, null, 2));
           const reconstructedMessage = reconstructMessage(message.messageData);
           handleMessage(reconstructedMessage);
-        } else if (message.message) {
-          // Fallback for backward compatibility
-          handleMessage(message.message);
         }
         break;
       case 'messageChunk':
         if (message.chunkData) {
           handleMessageChunk(message.chunkData);
-        } else if (message.chunk) {
-          // Fallback for backward compatibility
-          handleMessageChunk(message.chunk);
         }
         break;
       case 'log':
@@ -322,7 +316,7 @@ interface Log {
   
   // Function to reconstruct message class instances from serialized data
   function reconstructMessage(messageData: any): BaseMessage {
-    const { type, content, name, additional_kwargs, id } = messageData;
+    const { type, content, name, additional_kwargs, id, tool_call_id } = messageData;
     console.log('[main.ts reconstructMessage]', JSON.stringify(messageData, null, 2));
     
     switch(type) {
@@ -333,7 +327,13 @@ interface Log {
       case 'system': 
         return new SystemMessage({ content, name, additional_kwargs, id });
       case 'tool': 
-        return new ToolMessage(messageData);
+        return new ToolMessage({
+          content,
+          name,
+          tool_call_id,
+          additional_kwargs,
+          id
+        });
       case 'ai_chunk':
         return new AIMessageChunk({ content, name, additional_kwargs, id });
       default: 

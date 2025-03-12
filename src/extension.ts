@@ -33,26 +33,6 @@ class DurrsorViewProvider implements vscode.WebviewViewProvider {
 				});
 			}
 		});
-		
-		// Subscribe to messages from the agent service
-		this._agentService.onMessageReceived((message) => {
-			if (this._view) {
-				console.log('[extension.ts onMessageReceived]', JSON.stringify(message, null, 2));
-				// Extract essential data from the message object to avoid serialization issues
-				const messageData = {
-					type: message._getType ? message._getType() : message.getType?.(),
-					content: message.content,
-					name: message.name,
-					additional_kwargs: message.additional_kwargs,
-					id: message.id
-				};
-				
-				this._view.webview.postMessage({
-					command: 'message',
-					messageData
-				});
-			}
-		});
 	}
 
 	resolveWebviewView(
@@ -141,9 +121,30 @@ class DurrsorViewProvider implements vscode.WebviewViewProvider {
 			// Set up event handlers for streaming
 			const messageHandler = this._agentService.onMessageReceived((message) => {
 				console.log('[extension.ts _handlePrompt, messageHandler]', JSON.stringify(message, null, 2));
+				// Extract essential data from the message object to avoid serialization issues
+				const messageData: {
+					type: string;
+					content: any;
+					name?: string;
+					additional_kwargs?: any;
+					id?: string;
+					tool_call_id?: string;
+				} = {
+					type: message._getType ? message._getType() : message.getType?.(),
+					content: message.content,
+					name: message.name,
+					additional_kwargs: message.additional_kwargs,
+					id: message.id
+				};
+				
+				// Add tool_call_id for ToolMessage objects
+				if (message instanceof ToolMessage) {
+					messageData.tool_call_id = message.tool_call_id;
+				}
+				
 				this._view?.webview.postMessage({
 					command: 'message',
-					message: message
+					messageData
 				});
 			});
 			
