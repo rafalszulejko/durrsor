@@ -286,37 +286,9 @@ code {
   color: #cb2431;
 }
 
-/* Streaming message styles */
+/* Streaming message styles - removed pulse animation */
 .message[data-message-id] {
   position: relative;
-}
-
-.message[data-message-id]::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  right: 0;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background-color: var(--vscode-activityBarBadge-background);
-  animation: pulse 1.5s infinite;
-  opacity: 0.7;
-}
-
-@keyframes pulse {
-  0% {
-    transform: scale(0.8);
-    opacity: 0.7;
-  }
-  50% {
-    transform: scale(1.2);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(0.8);
-    opacity: 0.7;
-  }
 }
 
 /* Remove streaming indicator when complete */

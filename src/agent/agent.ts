@@ -122,21 +122,4 @@ export class CodeAgent {
       return null;
     }
   }
-
-  /**
-   * Get the history of states for a thread.
-   * 
-   * @param threadId The thread ID
-   * @returns The history of states for the thread
-   */
-  async getStateHistory(threadId: string): Promise<GraphStateType[]> {
-    try {
-      const config = { configurable: { thread_id: threadId } };
-      const history = await this.app.getStateHistory(config);
-      return history.map((snapshot: { values: GraphStateType }) => snapshot.values);
-    } catch (error) {
-      this.logService.internal(`Error getting state history for thread ${threadId}: ${error}`);
-      return [];
-    }
-  }
 } 
