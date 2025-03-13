@@ -84,15 +84,13 @@ export const analyze = async (state: GraphStateType, logService: LogService) => 
   
   // Create system message for analysis
   const systemMessage = new SystemMessage(
-    `You are an expert at analyzing code changes.
-Your task is to translate a user's request into a precise specification of what files need to be modified and how.
-Format your response as:
-File: <filepath>
-Changes needed:
-- <specific change 1>
-- <specific change 2>
-
-Do not include specific code changes, line numbers or diffs, but full path must be included. Repeat for each file that needs changes.`
+    `You are an expert at analyzing code and user requests.
+Given the code context and conversation with the user, provide a detailed analysis. Focus on the latest user message but consider the entire conversation history.
+If no code changes are needed, provide relevant information or explanations based on the user's request. 
+If user's latest prompt doesn't ask for any changes, just provide the information without suggesting any changes.
+If code changes are necessary, specify:
+1. The full file path that needs to be modified
+2. A precise description of what changes need to be made`
   );
   
   // Create messages for the model

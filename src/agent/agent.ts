@@ -3,7 +3,15 @@ import { GraphState, GraphStateType } from "./graphState";
 import { analyze as analyzeNode } from "./nodes/analyze";
 import { generate as generateNode } from "./nodes/generate";
 import { LogService } from "../services/logService";
-import { BaseMessage, HumanMessage } from "@langchain/core/messages";
+import { BaseMessage, HumanMessage, SystemMessage } from "@langchain/core/messages";
+import { ChatOpenAI } from "@langchain/openai";
+import { z } from "zod";
+import * as vscode from 'vscode';
+
+
+const codeChangeSchema = z.object({
+  requires_code_changes: z.boolean()
+});
 
 /**
  * Agent class that creates and manages a LangGraph workflow for code generation.
@@ -14,6 +22,9 @@ export class CodeAgent {
   public app: any; // The compiled LangGraph application
   private logService: LogService;
   private checkpointer: MemorySaver;
+  private config = vscode.workspace.getConfiguration('durrsor');
+  private apiKey = this.config.get<string>('apiKey') || process.env.OPENAI_API_KEY || '';
+
 
   constructor(logService: LogService) {
     this.logService = logService;
@@ -29,7 +40,41 @@ export class CodeAgent {
         .addNode("analyze", (state: GraphStateType) => analyzeNode(state, this.logService))
         .addNode("generate", (state: GraphStateType) => generateNode(state, this.logService))
         .addEdge(START, "analyze")
-        .addEdge("analyze", "generate")
+        .addConditionalEdges(
+          "analyze",
+          async (state: any) => {
+            const model = new ChatOpenAI({
+              modelName: "gpt-4o-mini",
+              temperature: 0,
+              streaming: false,
+              apiKey: this.apiKey
+            });
+
+            const systemMessage = new SystemMessage(
+              `Analyze if the LLM analysis requires any code changes. 
+               Respond with a boolean value only.
+               Return true if any files need to be modified, created, or deleted.
+               Return false if the request is just for information, explanation, or analysis.`
+            );
+            // Get the latest human message from state
+            const humanMessages = state.messages.filter((msg: BaseMessage) => msg._getType() === 'human');
+            const latestHumanMessage = humanMessages[humanMessages.length - 1];
+
+            const modelWithStructure = model.withStructuredOutput(codeChangeSchema);
+            const response = await modelWithStructure.invoke([
+              systemMessage,
+              latestHumanMessage,
+              state.messages[state.messages.length - 1]
+            ]);
+            this.logService.internal(`Response from model: ${JSON.stringify(response)}`);
+
+            return response.requires_code_changes ? 'true' : 'false';
+          },
+          {
+            true: "generate",
+            false: END
+          }
+        )
         .addEdge("generate", END)
         .compile({ checkpointer: this.checkpointer });
   }
