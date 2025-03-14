@@ -6,7 +6,7 @@ import * as vscode from 'vscode';
 import { FileService } from "../../services/fileService";
 import { LogService } from "../../services/logService";
 import { AIMessage, SystemMessage } from "@langchain/core/messages";
-import { ANALYZE_INFO_PROMPT, ANALYZE_CHANGES_PROMPT } from "../prompts/analyze";
+import { ANALYZE_INFO_PROMPT, ANALYZE_CHANGES_PROMPT, CONTEXT_AGENT_PROMPT } from "../prompts/analyze";
 import { codeChangesRequired } from "../logic/codeChangesRequired";
 
 /**
@@ -32,14 +32,8 @@ export const analyze = async (state: GraphStateType, logService: LogService) => 
   const contextAgent = createReactAgent({
     llm: model,
     tools,
-    prompt: `You are an expert at understanding code dependencies and context. 
-    Your task is to read user messages and selected files, and determine if the files you have are enough to fulfill the user's request. 
-    If not, use the tool to read any additional files.`
+    prompt: CONTEXT_AGENT_PROMPT
   });
-  
-  // Get the latest user message
-  const userMessages = state.messages.filter(msg => msg._getType() === 'human');
-  const latestUserMessage = userMessages[userMessages.length - 1];
   
   logService.internal("Starting context analysis...");
   

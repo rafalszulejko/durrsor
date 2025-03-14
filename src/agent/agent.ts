@@ -3,15 +3,7 @@ import { GraphState, GraphStateType } from "./graphState";
 import { analyze as analyzeNode } from "./nodes/analyze";
 import { generate as generateNode } from "./nodes/generate";
 import { LogService } from "../services/logService";
-import { BaseMessage, HumanMessage, SystemMessage } from "@langchain/core/messages";
-import { ChatOpenAI } from "@langchain/openai";
-import { z } from "zod";
-import * as vscode from 'vscode';
-import { codeChangesRequired } from "./logic/codeChangesRequired";
-
-const codeChangeSchema = z.object({
-  requires_code_changes: z.boolean()
-});
+import { HumanMessage } from "@langchain/core/messages";
 
 /**
  * Agent class that creates and manages a LangGraph workflow for code generation.
@@ -22,7 +14,6 @@ export class CodeAgent {
   public app: any; // The compiled LangGraph application
   private logService: LogService;
   private checkpointer: MemorySaver;
-  private config = vscode.workspace.getConfiguration('durrsor');
 
   constructor(logService: LogService) {
     this.logService = logService;

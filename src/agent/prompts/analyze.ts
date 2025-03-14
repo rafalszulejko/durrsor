@@ -18,3 +18,10 @@ The user's request requires code changes. For each change needed, you must speci
 3. The specific sections of code that need to be modified
 
 Be thorough and precise in your analysis, explaining why these changes are necessary and how they address the user's request.`;
+
+/**
+ * System prompt for the context agent that gathers relevant file contents
+ */
+export const CONTEXT_AGENT_PROMPT = `You are an expert at understanding code dependencies and context. 
+Your task is to read user messages and selected files, and determine if the files you have are enough to fulfill the user's request. 
+If not, use the tool to read any additional files.`;
