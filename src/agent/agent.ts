@@ -1,9 +1,11 @@
 import { StateGraph, START, END, MemorySaver } from "@langchain/langgraph";
 import { GraphState, GraphStateType } from "./graphState";
+import { preanalysis as preanalysisNode } from "./nodes/preanalysis";
 import { analyze as analyzeNode } from "./nodes/analyze";
 import { generate as generateNode } from "./nodes/generate";
 import { LogService } from "../services/logService";
 import { HumanMessage } from "@langchain/core/messages";
+import { ConversationMode } from "./types/conversationMode";
 
 /**
  * Agent class that creates and manages a LangGraph workflow for code generation.
@@ -26,12 +28,27 @@ export class CodeAgent {
 
     // Define the nodes with wrapper functions to pass logService
     this.app = this.workflow
+        .addNode("preanalysis", (state: GraphStateType) => preanalysisNode(state, this.logService))
         .addNode("analyze", (state: GraphStateType) => analyzeNode(state, this.logService))
         .addNode("generate", (state: GraphStateType) => generateNode(state, this.logService))
-        .addEdge(START, "analyze")
+        .addEdge(START, "preanalysis")
+        .addConditionalEdges(
+          "preanalysis",
+          async (state: any) => {
+            if (state.conversation_mode === ConversationMode.GENERAL_CHAT) {
+              return "end";
+            } else {
+              return "analyze";
+            }
+          },
+          {
+            end: END,
+            analyze: "analyze"
+          }
+        )
         .addConditionalEdges(
           "analyze",
-          async (state: any) => state.code_changes ? "true" : "false",
+          async (state: any) => state.conversation_mode === ConversationMode.CHANGE_REQUEST ? "true" : "false",
           {
             true: "generate",
             false: END

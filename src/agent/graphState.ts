@@ -1,5 +1,6 @@
 import { Annotation } from "@langchain/langgraph";
 import { MessagesAnnotation } from "@langchain/langgraph";
+import { ConversationMode } from "./types/conversationMode";
 
 /**
  * GraphState defines the state schema for the agent workflow graph.
@@ -14,8 +15,8 @@ export const GraphState = Annotation.Root({
   // Context extracted from the code
   code_context: Annotation<string>(),
   
-  // Boolean indicating if code changes are required
-  code_changes: Annotation<boolean>(),
+  // Conversation mode for the current graph pass
+  conversation_mode: Annotation<ConversationMode>(),
   
   // List of files that have been modified
   files_modified: Annotation<string[]>(),
