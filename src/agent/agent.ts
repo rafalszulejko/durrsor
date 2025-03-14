@@ -3,7 +3,7 @@ import { GraphState, GraphStateType } from "./graphState";
 import { analyze as analyzeNode } from "./nodes/analyze";
 import { generate as generateNode } from "./nodes/generate";
 import { LogService } from "../services/logService";
-import { BaseMessage, HumanMessage } from "@langchain/core/messages";
+import { HumanMessage } from "@langchain/core/messages";
 
 /**
  * Agent class that creates and manages a LangGraph workflow for code generation.
@@ -29,7 +29,14 @@ export class CodeAgent {
         .addNode("analyze", (state: GraphStateType) => analyzeNode(state, this.logService))
         .addNode("generate", (state: GraphStateType) => generateNode(state, this.logService))
         .addEdge(START, "analyze")
-        .addEdge("analyze", "generate")
+        .addConditionalEdges(
+          "analyze",
+          async (state: any) => state.code_changes ? "true" : "false",
+          {
+            true: "generate",
+            false: END
+          }
+        )
         .addEdge("generate", END)
         .compile({ checkpointer: this.checkpointer });
   }
