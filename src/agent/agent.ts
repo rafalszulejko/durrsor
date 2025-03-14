@@ -7,7 +7,7 @@ import { BaseMessage, HumanMessage, SystemMessage } from "@langchain/core/messag
 import { ChatOpenAI } from "@langchain/openai";
 import { z } from "zod";
 import * as vscode from 'vscode';
-import { codeChangesRequired } from "./edges/codeChangesRequired";
+import { codeChangesRequired } from "./logic/codeChangesRequired";
 
 const codeChangeSchema = z.object({
   requires_code_changes: z.boolean()
@@ -40,7 +40,7 @@ export class CodeAgent {
         .addEdge(START, "analyze")
         .addConditionalEdges(
           "analyze",
-          codeChangesRequired,
+          async (state: any) => state.code_changes ? "true" : "false",
           {
             true: "generate",
             false: END

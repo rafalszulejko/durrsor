@@ -14,6 +14,9 @@ export const GraphState = Annotation.Root({
   // Context extracted from the code
   code_context: Annotation<string>(),
   
+  // Boolean indicating if code changes are required
+  code_changes: Annotation<boolean>(),
+  
   // List of files that have been modified
   files_modified: Annotation<string[]>(),
   

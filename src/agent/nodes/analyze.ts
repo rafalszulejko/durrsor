@@ -6,6 +6,8 @@ import * as vscode from 'vscode';
 import { FileService } from "../../services/fileService";
 import { LogService } from "../../services/logService";
 import { AIMessage, SystemMessage } from "@langchain/core/messages";
+import { ANALYZE_INFO_PROMPT, ANALYZE_CHANGES_PROMPT } from "../prompts/analyze";
+import { codeChangesRequired } from "../logic/codeChangesRequired";
 
 /**
  * Analyze node that processes the messages and prepares for code generation.
@@ -54,6 +56,7 @@ export const analyze = async (state: GraphStateType, logService: LogService) => 
   // Process all tool call arguments
   for (const msg of agentResult.messages) {
     // Check if the message has tool calls (using type assertion with caution)
+    logService.internal(`Processing message from context agent: ${JSON.stringify(msg)}`);
     const msgAny = msg as any;
     if (msgAny.tool_calls) {
       for (const call of msgAny.tool_calls) {
@@ -82,22 +85,18 @@ export const analyze = async (state: GraphStateType, logService: LogService) => 
   
   logService.internal("Analyzing code to determine necessary changes...");
   
-  // Create system message for analysis
-  const systemMessage = new SystemMessage(
-    `You are an expert at analyzing code and user requests.
-Given the code context and conversation with the user, provide a detailed analysis. Focus on the latest user message but consider the entire conversation history.
-If no code changes are needed, provide relevant information or explanations based on the user's request. 
-If user's latest prompt doesn't ask for any changes, just provide the information without suggesting any changes.
-If code changes are necessary, specify:
-1. The full file path that needs to be modified
-2. A precise description of what changes need to be made`
-  );
+  // Determine if code changes are required
+  const needsCodeChanges = await codeChangesRequired(state);
+    
+  // Select the appropriate system prompt based on whether code changes are required
+  const systemPrompt = needsCodeChanges ? ANALYZE_CHANGES_PROMPT : ANALYZE_INFO_PROMPT;
+  const systemMessage = new SystemMessage(systemPrompt);
   
   // Create messages for the model
   const modelMessages = [
     systemMessage,
     ...state.messages, // Include the entire conversation history
-    new SystemMessage(`Based on this code context:\n\n${gatheredContext}\n\nWhat precise changes need to be made to which files?`)
+    new SystemMessage(`Based on this code context:\n\n${gatheredContext}\n\nProvide a detailed analysis according to the instructions.`)
   ];
   
   // Get the refined response with streaming - use stream() to enable token-by-token streaming
@@ -123,6 +122,7 @@ If code changes are necessary, specify:
     const fallbackResponse = await model.invoke(modelMessages);
     return {
       code_context: gatheredContext,
+      code_changes: needsCodeChanges,
       messages: [...state.messages, fallbackResponse]
     };
   }
@@ -130,6 +130,7 @@ If code changes are necessary, specify:
   // Return updated state with the AI message
   return {
     code_context: gatheredContext,
+    code_changes: needsCodeChanges,
     messages: [...state.messages, refinedResponse]
   };
 }; 
