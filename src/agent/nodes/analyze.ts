@@ -7,7 +7,7 @@ import { FileService } from "../../services/fileService";
 import { LogService } from "../../services/logService";
 import { AIMessage, SystemMessage } from "@langchain/core/messages";
 import { ANALYZE_INFO_PROMPT, ANALYZE_CHANGES_PROMPT, CONTEXT_AGENT_PROMPT } from "../prompts/analyze";
-import { codeChangesRequired } from "../logic/codeChangesRequired";
+import { ConversationMode } from "../types/conversationMode";
 
 /**
  * Analyze node that processes the messages and prepares for code generation.
@@ -77,13 +77,12 @@ export const analyze = async (state: GraphStateType, logService: LogService) => 
     }
   }
   
-  logService.internal("Analyzing code to determine necessary changes...");
+  logService.internal(`Analyzing code with conversation mode: ${state.conversation_mode}`);
   
-  // Determine if code changes are required
-  const needsCodeChanges = await codeChangesRequired(state);
-    
-  // Select the appropriate system prompt based on whether code changes are required
-  const systemPrompt = needsCodeChanges ? ANALYZE_CHANGES_PROMPT : ANALYZE_INFO_PROMPT;
+  // Select the appropriate system prompt based on the conversation mode
+  const systemPrompt = state.conversation_mode === ConversationMode.CHANGE_REQUEST 
+    ? ANALYZE_CHANGES_PROMPT 
+    : ANALYZE_INFO_PROMPT;
   const systemMessage = new SystemMessage(systemPrompt);
   
   // Create messages for the model
@@ -116,7 +115,6 @@ export const analyze = async (state: GraphStateType, logService: LogService) => 
     const fallbackResponse = await model.invoke(modelMessages);
     return {
       code_context: gatheredContext,
-      code_changes: needsCodeChanges,
       messages: [...state.messages, fallbackResponse]
     };
   }
@@ -124,7 +122,6 @@ export const analyze = async (state: GraphStateType, logService: LogService) => 
   // Return updated state with the AI message
   return {
     code_context: gatheredContext,
-    code_changes: needsCodeChanges,
     messages: [...state.messages, refinedResponse]
   };
 }; 
