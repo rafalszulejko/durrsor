@@ -5,12 +5,11 @@ import * as vscode from 'vscode';
 import { GraphStateType } from "../graphState";
 import { LogService } from "../../services/logService";
 import { ConversationMode } from "../types/conversationMode";
-import { PREANALYSIS_SYSTEM_PROMPT, GENERAL_CHAT_SYSTEM_PROMPT } from "../prompts/preanalysis";
+import { PREANALYSIS_SYSTEM_PROMPT, GENERAL_CHAT_SYSTEM_PROMPT, MODE_DETECTION_SYSTEM_PROMPT } from "../prompts/preanalysis";
 
-// Define the schema for the preanalysis response
-const preanalysisSchema = z.object({
-  response: z.string().describe("A brief, helpful response to the user's query"),
-  response_mode: z.enum([
+// Define the schema for the mode detection response
+const modeDetectionSchema = z.object({
+  conversation_mode: z.enum([
     ConversationMode.GENERAL_CHAT,
     ConversationMode.CODEBASE_CHAT,
     ConversationMode.CHANGE_REQUEST
@@ -27,9 +26,9 @@ const getApiKey = (): string => {
 
 /**
  * Preanalysis node that:
- * 1. Provides an initial response to the user
- * 2. Determines the conversation mode for the current graph pass
- * 3. For general chat, generates a complete response
+ * 1. Determines the conversation mode for the current graph pass
+ * 2. For general chat, generates a complete response
+ * 3. For codebase chat or change request, provides an initial response
  * 
  * @param state Current graph state containing messages
  * @param logService Service for logging
@@ -38,34 +37,28 @@ const getApiKey = (): string => {
 export const preanalysis = async (state: GraphStateType, logService: LogService) => {
   logService.internal("Starting preanalysis...");
   
-  // Initialize the model
-  const model = new ChatOpenAI({
+  // Initialize the model for mode detection
+  const modeDetectionModel = new ChatOpenAI({
     modelName: "gpt-4o-mini", // Using a smaller model for quick classification
     temperature: 0,
     streaming: false,
     apiKey: getApiKey()
-  });
-
-  // Create the system message for preanalysis
-  const systemMessage = new SystemMessage(PREANALYSIS_SYSTEM_PROMPT);
+  }).withStructuredOutput(modeDetectionSchema);
   
-  // Create the model with structured output
-  const modelWithStructure = model.withStructuredOutput(preanalysisSchema);
-  
-  // Make the LLM call
+  // Make the LLM call to determine conversation mode
   logService.internal("Determining conversation mode...");
-  const response = await modelWithStructure.invoke([
-    systemMessage,
+  const modeResponse = await modeDetectionModel.invoke([
+    new SystemMessage(MODE_DETECTION_SYSTEM_PROMPT),
     ...state.messages
   ]);
 
-  logService.internal(`Conversation mode determined: ${response.response_mode}`);
+  const conversationMode = modeResponse.conversation_mode;
+  logService.internal(`Conversation mode determined: ${conversationMode}`);
   
-  // Create an AI message with the initial response
-  const initialResponse = new AIMessage(response.response);
+  // Handle the response based on the conversation mode
+  let responseContent = "";
   
-  // For general chat, generate a complete response
-  if (response.response_mode === ConversationMode.GENERAL_CHAT) {
+  if (conversationMode === ConversationMode.GENERAL_CHAT) {
     logService.internal("General chat mode detected, generating complete response...");
     
     // Use a more capable model for the complete response
@@ -86,11 +79,10 @@ export const preanalysis = async (state: GraphStateType, logService: LogService)
     ]);
     
     // Process the stream to collect the full response
-    let chatResponseContent = "";
     try {
       for await (const chunk of chatResponseStream) {
         if (chunk.content) {
-          chatResponseContent += chunk.content;
+          responseContent += chunk.content;
         }
       }
     } catch (error) {
@@ -99,24 +91,56 @@ export const preanalysis = async (state: GraphStateType, logService: LogService)
         chatSystemMessage,
         ...state.messages
       ]);
-      chatResponseContent = typeof fallbackResponse.content === 'string' 
+      responseContent = typeof fallbackResponse.content === 'string' 
         ? fallbackResponse.content 
         : JSON.stringify(fallbackResponse.content);
     }
+  } else {
+    // For codebase chat or change request, generate an initial response
+    logService.internal(`${conversationMode} mode detected, generating initial response...`);
     
-    // Create an AI message with the complete response
-    const completeResponse = new AIMessage(chatResponseContent);
+    // Use the preanalysis model for the initial response
+    const initialResponseModel = new ChatOpenAI({
+      modelName: "gpt-4o-mini",
+      temperature: 0.2,
+      streaming: true,
+      apiKey: getApiKey()
+    });
     
-    // Return updated state with the AI messages and conversation mode
-    return {
-      conversation_mode: response.response_mode,
-      messages: [...state.messages, initialResponse, completeResponse]
-    };
+    // Create a system message for the initial response
+    const initialResponseSystemMessage = new SystemMessage(PREANALYSIS_SYSTEM_PROMPT);
+    
+    // Make the LLM call with streaming
+    const initialResponseStream = await initialResponseModel.stream([
+      initialResponseSystemMessage,
+      ...state.messages
+    ]);
+    
+    // Process the stream to collect the full response
+    try {
+      for await (const chunk of initialResponseStream) {
+        if (chunk.content) {
+          responseContent += chunk.content;
+        }
+      }
+    } catch (error) {
+      logService.internal(`Error streaming initial response: ${error}`);
+      const fallbackResponse = await initialResponseModel.invoke([
+        initialResponseSystemMessage,
+        ...state.messages
+      ]);
+      responseContent = typeof fallbackResponse.content === 'string' 
+        ? fallbackResponse.content 
+        : JSON.stringify(fallbackResponse.content);
+    }
   }
   
-  // For codebase chat or change request, just return the initial response
+  // Create an AI message with the response
+  const aiResponse = new AIMessage(responseContent);
+  
+  // Return updated state with the response and conversation mode
   return {
-    conversation_mode: response.response_mode,
-    messages: [...state.messages, initialResponse]
+    conversation_mode: conversationMode,
+    messages: [...state.messages, aiResponse]
   };
 }; 
