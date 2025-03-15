@@ -14,8 +14,7 @@ import {
   AIMessageComponent,
   GenericMessageComponent,
   GenericToolComponent,
-  EditFileToolComponent,
-  ReadFileToolComponent
+  FileToolComponent
 } from '../components';
 
 /**
@@ -38,9 +37,12 @@ export function getComponentForMessage(message: BaseMessage, selectedFiles?: str
     
     switch (toolName) {
       case 'read_file_tool':
-        return new ReadFileToolComponent(message);
+        return new FileToolComponent(message, 'Read file');
       case 'edit_tool':
-        return new EditFileToolComponent(message);
+      case 'replace_file_tool':
+        return new FileToolComponent(message, 'Apply changes');
+      case 'create_file':
+        return new FileToolComponent(message, 'Create file');
       default:
         return new GenericToolComponent(message);
     }

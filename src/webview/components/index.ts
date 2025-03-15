@@ -3,6 +3,5 @@ export { HumanMessageComponent } from './HumanMessageComponent';
 export { AIMessageComponent } from './AIMessageComponent';
 export { GenericMessageComponent } from './GenericMessageComponent';
 export { GenericToolComponent } from './GenericToolComponent';
-export { EditFileToolComponent } from './EditFileToolComponent';
-export { ReadFileToolComponent } from './ReadFileToolComponent';
+export { FileToolComponent } from './FileToolComponent';
 export { LogMessageComponent } from './LogMessageComponent'; 

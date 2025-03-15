@@ -110,7 +110,7 @@ body {
   margin: 4px 0;
 }
 
-.read-file-tool, .edit-file-tool {
+.read-file-tool, .edit-file-tool, .file-tool {
   margin: 8px 0;
 }
 
@@ -227,7 +227,7 @@ body {
   display: inline-block;
 }
 
-.read-file-tool .file-content {
+.read-file-tool .file-content, .file-tool .file-content {
   border: 1px solid var(--vscode-panel-border);
   border-radius: 3px;
   padding: 8px;
@@ -235,7 +235,7 @@ body {
   overflow-y: auto;
 }
 
-.edit-file-tool .edit-content {
+.edit-file-tool .edit-content, .file-tool .edit-content {
   border: 1px solid var(--vscode-panel-border);
   border-radius: 3px;
   padding: 8px;

@@ -1,5 +1,7 @@
 import { ChatOpenAI } from "@langchain/openai";
 import { createEditTool } from "../tools/editTool";
+import { createReplaceFileTool } from "../tools/replaceFileTool";
+import { createCreateFileTool } from "../tools/createFileTool";
 import { createReactAgent } from "@langchain/langgraph/prebuilt";
 import { z } from "zod";
 import { GitService } from "../utils/git";
@@ -7,6 +9,10 @@ import { GraphStateType } from "../graphState";
 import * as vscode from 'vscode';
 import { LogService } from "../../services/logService";
 import { AIMessage, SystemMessage } from "@langchain/core/messages";
+import { 
+  CODE_GENERATION_SYSTEM_PROMPT, 
+  APPLY_CHANGES_AGENT_PROMPT 
+} from "../prompts/generate";
 
 /**
  * Generate node that:
@@ -36,15 +42,13 @@ export const generate = async (state: GraphStateType, logService: LogService) =>
   logService.internal("Generating code changes based on the analysis...");
   
   // Create system message for code generation
-  const systemMessage = new SystemMessage(
-    "You are an AI coding assistant. If asked, suggest code changes according to the best practices. Try formatting your code changes in unified diff format. Make sure every diff you make has only one header, you can split changes into multiple diffs if needed. Before every diff, include a little info about the file modified or created."
-  );
+  const systemMessage = new SystemMessage(CODE_GENERATION_SYSTEM_PROMPT);
   
   // Create messages for the model - ONLY use the analysis message, not the entire history
   const modelMessages = [
     systemMessage,
-    analysisMessage, // Only include the analysis message (refined response)
-    new SystemMessage(`Use the code context to implement the changes:\n\n${state.code_context}`)
+    new SystemMessage(`${state.code_context}`),
+    analysisMessage
   ];
   
   // Make the LLM call with streaming
@@ -81,11 +85,11 @@ export const generate = async (state: GraphStateType, logService: LogService) =>
   });
   
   // Create the agent to apply the changes
-  const tools = [createEditTool(logService)];
+  const tools = [createEditTool(logService), createReplaceFileTool(logService), createCreateFileTool(logService)];
   const agent = createReactAgent({
     llm: model,
     tools,
-    prompt: "You are an expert at identifying file paths and code diffs in text. Extract the file path and the diff/changes from the following text. Apply all changes from the LLM answer to appropriate files using tools.",
+    prompt: APPLY_CHANGES_AGENT_PROMPT,
     responseFormat: { type: "json_object", schema: editedFilesSchema }
   });
   
@@ -99,9 +103,10 @@ export const generate = async (state: GraphStateType, logService: LogService) =>
   
   for (const msg of agentResult.messages) {
     if (msg.content && typeof msg.content === 'string' && 
-        msg.content.includes("Successfully applied diff to file")) {
+        (msg.content.includes("Successfully applied diff to file") || 
+         msg.content.includes("Successfully replaced file contents"))) {
       // Extract file path using regex
-      const fileMatch = msg.content.match(/file `([^`]+)`/);
+      const fileMatch = msg.content.match(/file `([^`]+)`/) || msg.content.match(/file '([^']+)'/) || msg.content.match(/filePath":"([^"]+)"/);
       if (fileMatch) {
         files_modified.push(fileMatch[1]);
         logService.internal(`Modified file: ${fileMatch[1]}`);

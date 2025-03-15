@@ -2,7 +2,7 @@ import * as path from 'path';
 import * as diff from 'diff';
 import { z } from 'zod';
 import { DynamicStructuredTool } from '@langchain/core/tools';
-import { fixDiffLineNumbers } from './diffFix';
+import { fixDiffLineNumbers } from '../utils/diffFix';
 import { FileService } from '../../services/fileService';
 import * as vscode from 'vscode';
 import { LogService } from '../../services/logService';
@@ -75,7 +75,7 @@ async function applyDiff(file: string, diffContent: string, logService: LogServi
     }
     
     // Write the patched content back to the file using FileService
-    const writeResult = await fileService.writeFileContent(filePath, patchResult as string);
+    const writeResult = await fileService.writeToExistingFile(filePath, patchResult as string);
     
     if (!writeResult) {
       logService.error('Apply diff', 'Failed to write patched content to file');
