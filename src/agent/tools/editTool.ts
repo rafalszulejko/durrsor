@@ -2,7 +2,7 @@ import * as path from 'path';
 import * as diff from 'diff';
 import { z } from 'zod';
 import { DynamicStructuredTool } from '@langchain/core/tools';
-import { fixDiffLineNumbers } from './diffFix';
+import { fixDiffLineNumbers } from '../utils/diffFix';
 import { FileService } from '../../services/fileService';
 import * as vscode from 'vscode';
 import { LogService } from '../../services/logService';
