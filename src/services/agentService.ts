@@ -195,9 +195,6 @@ export class AgentService {
     // Commit the changes
     const commitHash = await GitService.addAllAndCommit(commitMessage);
     
-    // Emit a message about the commit
-    this._onMessageReceived.fire(new SystemMessage(`Changes committed with message: ${commitMessage}`));
-    
     return commitHash;
   }
   
