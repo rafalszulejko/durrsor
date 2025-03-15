@@ -78,96 +78,80 @@ export class GitService {
       
       console.log(`GitService: Got repository: ${gitData.repo.rootUri.fsPath}`);
       
-      // Log repository state and available methods
+      // Log repository state
       console.log(`GitService: Repository state:`, {
         headSHA: gitData.repo.state.HEAD?.commit || 'unknown',
         branch: gitData.repo.state.HEAD?.name || 'unknown',
-        repoHasChanges: (gitData.repo.state.workingTreeChanges || []).length > 0,
-        indexChanges: (gitData.repo.state.indexChanges || []).length
+        workingTreeChanges: (gitData.repo.state.workingTreeChanges || []).length,
+        indexChanges: (gitData.repo.state.indexChanges || []).length,
+        untrackedChanges: (gitData.repo.state.untrackedChanges || []).length
       });
       
-      // Check if repo has the required methods
-      console.log(`GitService: Repository methods:`, {
-        hasAddMethod: typeof gitData.repo.add === 'function',
-        hasCommitMethod: typeof gitData.repo.commit === 'function',
-        hasGetCommitMethod: typeof gitData.repo.getCommit === 'function',
-        hasDiffWithHEADMethod: typeof gitData.repo.diffWithHEAD === 'function'
-      });
-      
-      // Get all changes using diffWithHEAD
-      console.log(`GitService: Getting list of changed files`);
       try {
-        // Get all changes from working tree
-        const changes: Change[] = await gitData.repo.diffWithHEAD();
-        console.log(`GitService: Found ${changes.length} changed files`);
+        // Get all changes from the working tree
+        const workingTreeChanges = gitData.repo.state.workingTreeChanges;
         
-        // Extract file paths from changes
-        const changedPaths = changes.map(change => change.uri.fsPath);
-        console.log(`GitService: Changed paths:`, changedPaths.slice(0, 5)); // Log first 5 for brevity
+        // Log detailed information about working tree changes
+        console.log(`GitService: Found ${workingTreeChanges.length} working tree changes`);
         
-        // Also check for untracked files
-        const untrackedChanges: Change[] = gitData.repo.state.untrackedChanges || [];
-        console.log(`GitService: Found ${untrackedChanges.length} untracked files`);
+        if (workingTreeChanges.length > 0) {
+          // Log the first few changes with their status for debugging
+          console.log(`GitService: Working tree changes details (first 5):`);
+          workingTreeChanges.slice(0, 5).forEach((change: Change, index: number) => {
+            console.log(`  Change ${index + 1}:`, {
+              path: change.uri.fsPath,
+              status: change.status,
+              isUntracked: change.status === 7 // Status.UNTRACKED is 7
+            });
+          });
+        }
         
-        // Combine all paths that need to be added
-        const allPaths = [
-          ...changedPaths,
-          ...untrackedChanges.map(change => change.uri.fsPath)
-        ];
-        
-        if (allPaths.length === 0) {
-          console.log(`GitService: No changes to add`);
+        if (workingTreeChanges.length === 0) {
+          console.log(`GitService: No changes to commit`);
           return "No changes to commit";
         }
         
+        // Extract file paths from working tree changes
+        const pathsToAdd = workingTreeChanges.map((change: Change) => change.uri.fsPath);
+        
+        // Log the paths we're going to add
+        console.log(`GitService: Paths to add (first 5):`, pathsToAdd.slice(0, 5));
+        
         // Add all changes
-        console.log(`GitService: Attempting to add ${allPaths.length} files`);
-        await gitData.repo.add(allPaths);
-        console.log(`GitService: Successfully added all changes`);
-      } catch (addError: any) {
-        console.error(`GitService: Error adding changes: ${addError.message}`, addError);
-        console.error(`GitService: Error stack: ${addError.stack}`);
-        throw addError;
-      }
-      
-      // Commit with the provided message
-      console.log(`GitService: Attempting to commit with message: "${commitMessage}"`);
-      try {
-        // Use the correct commit method signature from the API definition
+        console.log(`GitService: Adding ${pathsToAdd.length} files`);
+        await gitData.repo.add(pathsToAdd);
+        
+        // Verify that changes were staged
+        await gitData.repo.status();
+        console.log(`GitService: After staging, index changes:`, gitData.repo.state.indexChanges.length);
+        
+        // Commit with the provided message
+        console.log(`GitService: Attempting to commit with message: "${commitMessage}"`);
         await gitData.repo.commit(commitMessage);
         console.log(`GitService: Successfully committed changes`);
-      } catch (commitError: any) {
-        console.error(`GitService: Error committing changes: ${commitError.message}`, commitError);
-        console.error(`GitService: Error stack: ${commitError.stack}`);
         
-        // Try to get more information about the repository state after commit failure
+        // Get the commit hash
+        console.log(`GitService: Attempting to get commit hash`);
+        const head = await gitData.repo.getCommit('HEAD');
+        console.log(`GitService: Successfully got commit hash: ${head.hash}`);
+        return head.hash;
+      } catch (error: any) {
+        console.error(`GitService: Error in git operation: ${error.message}`, error);
+        console.error(`GitService: Error stack: ${error.stack}`);
+        
+        // Try to get more information about the repository state after failure
         try {
-          // Use the correct status method from the API definition
           await gitData.repo.status();
-          console.log(`GitService: Repository status called after commit failure`);
-          
-          // Log the current state of the repository
-          console.log(`GitService: Current repository state:`, {
+          console.log(`GitService: Repository status after failure:`, {
             workingTreeChanges: gitData.repo.state.workingTreeChanges.length,
-            indexChanges: gitData.repo.state.indexChanges.length
+            indexChanges: gitData.repo.state.indexChanges.length,
+            untrackedChanges: gitData.repo.state.untrackedChanges.length
           });
         } catch (statusError) {
           console.error(`GitService: Could not get repository status:`, statusError);
         }
         
-        throw commitError;
-      }
-      
-      // Get the commit hash
-      console.log(`GitService: Attempting to get commit hash`);
-      try {
-        const head = await gitData.repo.getCommit('HEAD');
-        console.log(`GitService: Successfully got commit hash: ${head.hash}`);
-        return head.hash;
-      } catch (hashError: any) {
-        console.error(`GitService: Error getting commit hash: ${hashError.message}`, hashError);
-        console.error(`GitService: Error stack: ${hashError.stack}`);
-        throw hashError;
+        throw error;
       }
     } catch (error: any) {
       console.error('GitService: Error in git operation:', error);
