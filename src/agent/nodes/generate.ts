@@ -1,6 +1,7 @@
 import { ChatOpenAI } from "@langchain/openai";
 import { createEditTool } from "../tools/editTool";
 import { createReplaceFileTool } from "../tools/replaceFileTool";
+import { createCreateFileTool } from "../tools/createFileTool";
 import { createReactAgent } from "@langchain/langgraph/prebuilt";
 import { z } from "zod";
 import { GitService } from "../utils/git";
@@ -84,7 +85,7 @@ export const generate = async (state: GraphStateType, logService: LogService) =>
   });
   
   // Create the agent to apply the changes
-  const tools = [createEditTool(logService), createReplaceFileTool(logService)];
+  const tools = [createEditTool(logService), createReplaceFileTool(logService), createCreateFileTool(logService)];
   const agent = createReactAgent({
     llm: model,
     tools,
