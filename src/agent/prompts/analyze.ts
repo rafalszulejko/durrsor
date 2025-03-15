@@ -14,8 +14,7 @@ export const ANALYZE_CHANGES_PROMPT = `You are an expert at analyzing code and u
 Given the code context and conversation with the user, provide a detailed analysis. Focus on the latest user message but consider the entire conversation history.
 The user's request requires code changes. For each change needed, you must specify:
 1. The full file path that needs to be modified
-2. A precise description of what changes need to be made
-3. The specific sections of code that need to be modified
+2. A precise description of what changes need to be made. No code though.
 
 Be thorough and precise in your analysis, explaining why these changes are necessary and how they address the user's request.`;
 

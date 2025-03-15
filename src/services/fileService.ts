@@ -46,6 +46,47 @@ export class FileService {
   }
   
   /**
+   * Check if a file exists in the workspace
+   * 
+   * @param filePath Path to file (relative to workspace)
+   * @returns True if the file exists, false otherwise
+   */
+  async fileExists(filePath: string): Promise<boolean> {
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders) {
+      return false;
+    }
+    
+    const fileUri = vscode.Uri.joinPath(workspaceFolders[0].uri, filePath);
+    
+    try {
+      await vscode.workspace.fs.stat(fileUri);
+      return true;
+    } catch (error) {
+      return false;
+    }
+  }
+  
+  /**
+   * Write content to a file only if it exists
+   * 
+   * @param filePath Path to file (relative to workspace)
+   * @param content Content to write to the file
+   * @returns True if file exists and write was successful, false otherwise
+   */
+  async writeToExistingFile(filePath: string, content: string): Promise<boolean> {
+    // Check if file exists first
+    const exists = await this.fileExists(filePath);
+    if (!exists) {
+      console.error(`Cannot write to non-existent file: ${filePath}`);
+      return false;
+    }
+    
+    // Write content to the file
+    return await this.writeFileContent(filePath, content);
+  }
+  
+  /**
    * Write content to a file
    * 
    * @param filePath Path to file (relative to workspace)
