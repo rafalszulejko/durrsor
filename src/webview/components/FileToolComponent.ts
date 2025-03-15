@@ -1,9 +1,17 @@
 import { MessageComponent } from './MessageComponent';
+import { BaseMessage } from '@langchain/core/messages';
 
-export class ReadFileToolComponent extends MessageComponent {
+export class FileToolComponent extends MessageComponent {
+  private label: string;
+  
+  constructor(message: BaseMessage, label: string) {
+    super(message);
+    this.label = label;
+  }
+  
   render(): HTMLElement {
     const element = document.createElement('div');
-    element.className = 'message tool-message read-file-tool';
+    element.className = 'message tool-message file-tool';
     
     // Parse the content as JSON
     let filePath = 'Unknown file';
@@ -14,7 +22,7 @@ export class ReadFileToolComponent extends MessageComponent {
       filePath = contentObj.filePath || 'Unknown file';
       success = Boolean(contentObj.success);
     } catch (e) {
-      console.error('Failed to parse ReadFileToolComponent content as JSON', e);
+      console.error('Failed to parse file tool content as JSON', e);
     }
     
     // Create a single row frame
@@ -24,7 +32,7 @@ export class ReadFileToolComponent extends MessageComponent {
     // Add tool name
     const toolNameElement = document.createElement('span');
     toolNameElement.className = 'tool-name';
-    toolNameElement.textContent = 'Read file';
+    toolNameElement.textContent = this.label;
     
     // Add file path
     const filePathElement = document.createElement('span');
