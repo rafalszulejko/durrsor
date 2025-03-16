@@ -6,8 +6,7 @@ import * as vscode from 'vscode';
 import { FileService } from "../../services/fileService";
 import { LogService } from "../../services/logService";
 import { AIMessage, SystemMessage } from "@langchain/core/messages";
-import { ANALYZE_INFO_PROMPT, ANALYZE_CHANGES_PROMPT, CONTEXT_AGENT_PROMPT } from "../prompts/analyze";
-import { VALIDATION_FEEDBACK_PROMPT } from "../prompts/validation";
+import { ANALYZE_INFO_PROMPT, ANALYZE_CHANGES_PROMPT, CONTEXT_AGENT_PROMPT, VALIDATION_FEEDBACK_PROMPT } from "../prompts/analyze";
 import { ConversationMode } from "../types/conversationMode";
 
 /**

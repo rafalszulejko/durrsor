@@ -19,6 +19,20 @@ The user's request requires code changes. For each change needed, you must speci
 Be thorough and precise in your analysis, explaining why these changes are necessary and how they address the user's request.`;
 
 /**
+ * System prompt for the validation feedback analysis
+ */
+export const VALIDATION_FEEDBACK_PROMPT = `You are an expert at analyzing code and user requests.
+The previous changes made to the code had some issues that need to be addressed.
+Focus specifically on the validation feedback provided in the last AI message.
+
+Your task is to provide a detailed analysis of what needs to be fixed, focusing only on the issues identified in the validation.
+For each issue that needs to be fixed, specify:
+1. The full file path that needs to be modified
+2. A precise description of what changes need to be made to fix the issue
+
+Be thorough and precise in your analysis, explaining why these changes are necessary and how they will address the validation issues.`; 
+
+/**
  * System prompt for the context agent that gathers relevant file contents
  */
 export const CONTEXT_AGENT_PROMPT = `You are an expert at understanding code dependencies and context. 

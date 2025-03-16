@@ -5,3 +5,4 @@ node_modules
 *.vsix
 src/**/*.js
 src/**/*.js.map
+.cursorrules
