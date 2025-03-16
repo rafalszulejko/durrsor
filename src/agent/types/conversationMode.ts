@@ -18,5 +18,11 @@ export enum ConversationMode {
    * Change request mode for making changes to the codebase.
    * This mode will analyze the codebase and generate code changes.
    */
-  CHANGE_REQUEST = "change_request"
+  CHANGE_REQUEST = "change_request",
+  
+  /**
+   * Validation feedback mode for addressing issues found during validation.
+   * This mode will focus on fixing specific problems identified in the validation step.
+   */
+  VALIDATION_FEEDBACK = "validation_feedback"
 } 

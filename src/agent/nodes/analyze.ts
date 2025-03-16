@@ -6,7 +6,7 @@ import * as vscode from 'vscode';
 import { FileService } from "../../services/fileService";
 import { LogService } from "../../services/logService";
 import { AIMessage, SystemMessage } from "@langchain/core/messages";
-import { ANALYZE_INFO_PROMPT, ANALYZE_CHANGES_PROMPT, CONTEXT_AGENT_PROMPT } from "../prompts/analyze";
+import { ANALYZE_INFO_PROMPT, ANALYZE_CHANGES_PROMPT, CONTEXT_AGENT_PROMPT, VALIDATION_FEEDBACK_PROMPT } from "../prompts/analyze";
 import { ConversationMode } from "../types/conversationMode";
 
 /**
@@ -80,9 +80,14 @@ export const analyze = async (state: GraphStateType, logService: LogService) => 
   logService.internal(`Analyzing code with conversation mode: ${state.conversation_mode}`);
   
   // Select the appropriate system prompt based on the conversation mode
-  const systemPrompt = state.conversation_mode === ConversationMode.CHANGE_REQUEST 
-    ? ANALYZE_CHANGES_PROMPT 
-    : ANALYZE_INFO_PROMPT;
+  let systemPrompt;
+  if (state.conversation_mode === ConversationMode.VALIDATION_FEEDBACK) {
+    systemPrompt = VALIDATION_FEEDBACK_PROMPT;
+  } else if (state.conversation_mode === ConversationMode.CHANGE_REQUEST) {
+    systemPrompt = ANALYZE_CHANGES_PROMPT;
+  } else {
+    systemPrompt = ANALYZE_INFO_PROMPT;
+  }
   const systemMessage = new SystemMessage(systemPrompt);
   
   // Create messages for the model

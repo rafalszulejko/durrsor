@@ -3,6 +3,7 @@ import { GraphState, GraphStateType } from "./graphState";
 import { preanalysis as preanalysisNode } from "./nodes/preanalysis";
 import { analyze as analyzeNode } from "./nodes/analyze";
 import { generate as generateNode } from "./nodes/generate";
+import { validation as validationNode } from "./nodes/validation";
 import { LogService } from "../services/logService";
 import { HumanMessage } from "@langchain/core/messages";
 import { ConversationMode } from "./types/conversationMode";
@@ -31,6 +32,7 @@ export class CodeAgent {
         .addNode("preanalysis", (state: GraphStateType) => preanalysisNode(state, this.logService))
         .addNode("analyze", (state: GraphStateType) => analyzeNode(state, this.logService))
         .addNode("generate", (state: GraphStateType) => generateNode(state, this.logService))
+        .addNode("validation", (state: GraphStateType) => validationNode(state, this.logService))
         .addEdge(START, "preanalysis")
         .addConditionalEdges(
           "preanalysis",
@@ -48,13 +50,28 @@ export class CodeAgent {
         )
         .addConditionalEdges(
           "analyze",
-          async (state: any) => state.conversation_mode === ConversationMode.CHANGE_REQUEST ? "true" : "false",
+          async (state: any) => state.conversation_mode === ConversationMode.CHANGE_REQUEST || 
+                               state.conversation_mode === ConversationMode.VALIDATION_FEEDBACK ? "true" : "false",
           {
             true: "generate",
             false: END
           }
         )
-        .addEdge("generate", END)
+        .addEdge("generate", "validation")
+        .addConditionalEdges(
+          "validation",
+          async (state: any) => {
+            if (state.conversation_mode === ConversationMode.VALIDATION_FEEDBACK) {
+              return "analyze";
+            } else {
+              return "end";
+            }
+          },
+          {
+            analyze: "analyze",
+            end: END
+          }
+        )
         .compile({ checkpointer: this.checkpointer });
   }
 
