@@ -6,10 +6,10 @@ import { LogService, LogLevel } from './logService';
 import { BaseMessage, HumanMessage, SystemMessage, AIMessageChunk, ToolMessage } from '@langchain/core/messages';
 import { GitService } from '../agent/utils/git';
 import { v4 as uuidv4 } from "uuid";
+import { ModelProvider } from '../agent/utils/modelProvider';
 
 export class AgentService {
   private agent: CodeAgent;
-  private apiKey: string;
   private logService: LogService;
   private _onMessageReceived = new vscode.EventEmitter<BaseMessage>();
   public readonly onMessageReceived = this._onMessageReceived.event;
@@ -19,10 +19,6 @@ export class AgentService {
   constructor(logService: LogService) {
     this.logService = logService;
     this.agent = new CodeAgent(logService);
-    
-    // Get API key from extension settings
-    const config = vscode.workspace.getConfiguration('durrsor');
-    this.apiKey = config.get<string>('apiKey') || process.env.OPENAI_API_KEY || '';
   }
   
   /**
@@ -167,12 +163,11 @@ export class AgentService {
   private async commitChanges(state: GraphStateType, diff: string): Promise<string> {
     this.logService.thinking("Generating commit message...");
     
+    // Get the model provider instance
+    const modelProvider = ModelProvider.getInstance();
+    
     // Initialize the model
-    const model = new ChatOpenAI({
-      modelName: "gpt-4o",
-      temperature: 0,
-      apiKey: this.apiKey
-    });
+    const model = modelProvider.getBigModel(0, false);
     
     // Get the user message that initiated the changes
     const userMessages = state.messages.filter(msg => msg._getType() === 'human');

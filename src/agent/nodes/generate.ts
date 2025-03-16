@@ -1,4 +1,3 @@
-import { ChatOpenAI } from "@langchain/openai";
 import { createEditTool } from "../tools/editTool";
 import { createReplaceFileTool } from "../tools/replaceFileTool";
 import { createCreateFileTool } from "../tools/createFileTool";
@@ -6,13 +5,13 @@ import { createReactAgent } from "@langchain/langgraph/prebuilt";
 import { z } from "zod";
 import { GitService } from "../utils/git";
 import { GraphStateType } from "../graphState";
-import * as vscode from 'vscode';
 import { LogService } from "../../services/logService";
 import { AIMessage, SystemMessage } from "@langchain/core/messages";
 import { 
   CODE_GENERATION_SYSTEM_PROMPT, 
   APPLY_CHANGES_AGENT_PROMPT 
 } from "../prompts/generate";
+import { ModelProvider } from "../utils/modelProvider";
 
 /**
  * Generate node that:
@@ -23,17 +22,11 @@ import {
  * @returns Updated state with modified files tracked
  */
 export const generate = async (state: GraphStateType, logService: LogService) => {
-  // Get API key from extension settings
-  const config = vscode.workspace.getConfiguration('durrsor');
-  const apiKey = config.get<string>('apiKey') || process.env.OPENAI_API_KEY || '';
+  // Get the model provider instance
+  const modelProvider = ModelProvider.getInstance();
   
   // Initialize the model for the first LLM call with streaming enabled
-  const model = new ChatOpenAI({
-    modelName: "gpt-4o",
-    temperature: 0,
-    apiKey: apiKey,
-    streaming: true
-  });
+  const model = modelProvider.getBigModel(0, true);
   
   // Get the analysis message (last AI message)
   const aiMessages = state.messages.filter(msg => msg._getType() === 'ai');

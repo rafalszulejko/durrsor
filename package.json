@@ -44,6 +44,24 @@
           "type": "string",
           "default": "",
           "description": "API key for the Durrsor service"
+        },
+        "durrsor.bigModel": {
+          "type": "string",
+          "default": "gpt-4o",
+          "enum": ["gpt-4o"],
+          "enumDescriptions": [
+            "GPT-4o - OpenAI's most capable model"
+          ],
+          "description": "Select the high-capability model to use for code generation and analysis"
+        },
+        "durrsor.smallModel": {
+          "type": "string",
+          "default": "gpt-4o-mini",
+          "enum": ["gpt-4o-mini"],
+          "enumDescriptions": [
+            "GPT-4o-mini - Smaller, faster OpenAI model"
+          ],
+          "description": "Select the smaller, faster model to use for agent logic and summaries"
         }
       }
     }
