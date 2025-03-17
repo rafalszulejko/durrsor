@@ -16,10 +16,10 @@ interface FileCreationOutput {
  * Create a new file with the specified content.
  * @param filePath Path to the file to be created
  * @param content The content to write to the file
- * @param logService LogService instance for logging
  * @returns Result of the file creation
  */
-async function createFile(filePath: string, content: string, logService: LogService): Promise<FileCreationOutput> {
+async function createFile(filePath: string, content: string): Promise<FileCreationOutput> {
+  const logService = LogService.getInstance();
   try {
     const fileService = new FileService();
     
@@ -46,10 +46,10 @@ async function createFile(filePath: string, content: string, logService: LogServ
  * Create a tool for creating new files with specified content.
  * This tool is designed to work within a VSCode extension context.
  * 
- * @param logService LogService instance for logging
  * @returns DynamicStructuredTool instance
  */
-export function createCreateFileTool(logService: LogService): DynamicStructuredTool<any> {
+export function createCreateFileTool(): DynamicStructuredTool<any> {
+  const logService = LogService.getInstance();
   return new DynamicStructuredTool({
     name: 'create_file',
     description: 'Create a new file with the specified content. Will throw an error if the file already exists.',
@@ -59,7 +59,7 @@ export function createCreateFileTool(logService: LogService): DynamicStructuredT
     }),
     func: async ({ filePath, content }) => {
       try {
-        const result = await createFile(filePath, content, logService);
+        const result = await createFile(filePath, content);
         return JSON.stringify(result);
       } catch (e) {
         const error = e as Error;

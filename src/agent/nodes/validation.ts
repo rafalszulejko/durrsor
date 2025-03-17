@@ -16,7 +16,9 @@ import { ModelService } from "../../services/modelService";
  * @param state Current graph state containing messages and modified files
  * @returns Updated state with validation results and possibly updated conversation mode
  */
-export const validation = async (state: GraphStateType, logService: LogService) => {
+export const validation = async (state: GraphStateType) => {
+  const logService = LogService.getInstance();
+  
   // Get the model provider instance
   const modelProvider = ModelService.getInstance();
   

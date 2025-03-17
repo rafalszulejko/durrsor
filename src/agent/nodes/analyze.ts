@@ -14,7 +14,9 @@ import { ModelService } from "../../services/modelService";
  * 1. Uses reactive agent to gather relevant file contents
  * 2. Refines the user prompt into a precise action plan
  */
-export const analyze = async (state: GraphStateType, logService: LogService) => {
+export const analyze = async (state: GraphStateType) => {
+  const logService = LogService.getInstance();
+  
   // Get the model provider instance
   const modelProvider = ModelService.getInstance();
   
@@ -22,7 +24,7 @@ export const analyze = async (state: GraphStateType, logService: LogService) => 
   const model = modelProvider.getBigModel(0, true);
   
   // Create the agent for context gathering with streaming enabled
-  const tools = [createReadFileTool(logService)];
+  const tools = [createReadFileTool()];
   const contextAgent = createReactAgent({
     llm: model,
     tools,

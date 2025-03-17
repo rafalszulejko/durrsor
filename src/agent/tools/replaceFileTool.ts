@@ -17,10 +17,10 @@ interface ReplaceFileOutput {
  * Replace the contents of the specified file with the provided content.
  * @param filePath Path to the file to be modified (relative to workspace)
  * @param content New content to replace the file with
- * @param logService LogService instance for logging
  * @returns Result of the file replacement operation
  */
-async function replaceFile(filePath: string, content: string, logService: LogService): Promise<ReplaceFileOutput> {
+async function replaceFile(filePath: string, content: string): Promise<ReplaceFileOutput> {
+  const logService = LogService.getInstance();
   try {
     // Ensure workspace exists
     if (!vscode.workspace.workspaceFolders) {
@@ -66,10 +66,10 @@ async function replaceFile(filePath: string, content: string, logService: LogSer
  * Create a replace file tool that replaces the entire contents of a file with provided content.
  * This tool is designed to work within a VSCode extension context.
  * 
- * @param logService LogService instance for logging
  * @returns DynamicStructuredTool instance
  */
-export function createReplaceFileTool(logService: LogService): DynamicStructuredTool<any> {
+export function createReplaceFileTool(): DynamicStructuredTool<any> {
+  const logService = LogService.getInstance();
   return new DynamicStructuredTool({
     name: 'replace_file_tool',
     description: 'Replace the entire contents of a file with provided content',
@@ -79,7 +79,7 @@ export function createReplaceFileTool(logService: LogService): DynamicStructured
     }),
     func: async ({ filePath, content }) => {
       try {
-        const result = await replaceFile(filePath, content, logService);
+        const result = await replaceFile(filePath, content);
         return JSON.stringify(result);
       } catch (e) {
         const error = e as Error;

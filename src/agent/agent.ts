@@ -18,8 +18,8 @@ export class CodeAgent {
   private logService: LogService;
   private checkpointer: MemorySaver;
 
-  constructor(logService: LogService) {
-    this.logService = logService;
+  constructor() {
+    this.logService = LogService.getInstance();
     
     // Initialize the state graph
     this.workflow = new StateGraph(GraphState);
@@ -29,10 +29,10 @@ export class CodeAgent {
 
     // Define the nodes with wrapper functions to pass logService
     this.app = this.workflow
-        .addNode("preanalysis", (state: GraphStateType) => preanalysisNode(state, this.logService))
-        .addNode("analyze", (state: GraphStateType) => analyzeNode(state, this.logService))
-        .addNode("generate", (state: GraphStateType) => generateNode(state, this.logService))
-        .addNode("validation", (state: GraphStateType) => validationNode(state, this.logService))
+        .addNode("preanalysis", (state: GraphStateType) => preanalysisNode(state))
+        .addNode("analyze", (state: GraphStateType) => analyzeNode(state))
+        .addNode("generate", (state: GraphStateType) => generateNode(state))
+        .addNode("validation", (state: GraphStateType) => validationNode(state))
         .addEdge(START, "preanalysis")
         .addConditionalEdges(
           "preanalysis",

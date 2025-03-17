@@ -22,10 +22,10 @@ const modeDetectionSchema = z.object({
  * 3. For codebase chat or change request, provides an initial response
  * 
  * @param state Current graph state containing messages
- * @param logService Service for logging
  * @returns Updated state with conversation mode and updated messages
  */
-export const preanalysis = async (state: GraphStateType, logService: LogService) => {
+export const preanalysis = async (state: GraphStateType) => {
+  const logService = LogService.getInstance();
   logService.internal("Starting preanalysis...");
   
   // Get the model provider instance

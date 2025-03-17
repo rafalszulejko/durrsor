@@ -21,7 +21,9 @@ import { ModelService } from "../../services/modelService";
  * @param state Current graph state containing messages and code context
  * @returns Updated state with modified files tracked
  */
-export const generate = async (state: GraphStateType, logService: LogService) => {
+export const generate = async (state: GraphStateType) => {
+  const logService = LogService.getInstance();
+  
   // Get the model provider instance
   const modelProvider = ModelService.getInstance();
   
@@ -78,7 +80,7 @@ export const generate = async (state: GraphStateType, logService: LogService) =>
   });
   
   // Create the agent to apply the changes
-  const tools = [createEditTool(logService), createReplaceFileTool(logService), createCreateFileTool(logService)];
+  const tools = [createEditTool(), createReplaceFileTool(), createCreateFileTool()];
   const agent = createReactAgent({
     llm: model,
     tools,

@@ -16,9 +16,9 @@ export class AgentService {
   private _onMessageChunkReceived = new vscode.EventEmitter<{content: string, id: string}>();
   public readonly onMessageChunkReceived = this._onMessageChunkReceived.event;
   
-  constructor(logService: LogService) {
-    this.logService = logService;
-    this.agent = new CodeAgent(logService);
+  constructor() {
+    this.logService = LogService.getInstance();
+    this.agent = new CodeAgent();
   }
   
   /**
@@ -43,6 +43,8 @@ export class AgentService {
       // Create new branch for this thread
       this.logService.internal(`Creating branch for thread: ${threadId}`);
       await GitService.createAndCheckoutBranch(threadId);
+      // Set the thread ID in the LogService
+      this.logService.setThreadId(threadId);
     }
     
     // Create a human message
@@ -93,18 +95,21 @@ export class AgentService {
               // Node is starting execution
               if (event.name !== "LangGraph" && event.name !== "__start__") {
                 this.logService.internal(`Starting node: ${event.name}`);
+                this.logService.internal(`on_chain_start event data: ${JSON.stringify(event.data)}`);
               }
             }
             else if (event.event === "on_chain_end") {
               // Node has finished execution
               if (event.name !== "LangGraph" && event.name !== "__start__") {
                 this.logService.internal(`Finished node: ${event.name}`);
+                this.logService.internal(`on_chain_end event data: ${JSON.stringify(event.data)}`);
               }
             }
             else if (event.event === "on_chain_stream") {
               // Node has produced a partial result
               if (event.name !== "LangGraph") {
                 this.logService.internal(`Node update: ${event.name}`);
+                this.logService.internal(`on_chain_stream event data: ${JSON.stringify(event.data)}`);
               }
             }
           } catch (eventError) {
@@ -138,6 +143,9 @@ export class AgentService {
         // Add diff and commit hash to result
         result.diff = diff;
         result.commit_hash = commitHash;
+        
+        // Save logs to file after committing changes
+        await this.logService.saveLogs();
       }
       
       return result;
@@ -148,6 +156,9 @@ export class AgentService {
       // Emit an error message to the UI
       const errorMessage = error instanceof Error ? error.message : String(error);
       this._onMessageReceived.fire(new SystemMessage(`Error: ${errorMessage}`));
+      
+      // Save logs even in case of error
+      await this.logService.saveLogs();
       
       throw error;
     }

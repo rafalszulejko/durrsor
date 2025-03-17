@@ -19,8 +19,8 @@ class DurrsorViewProvider implements vscode.WebviewViewProvider {
 	private _previousState?: GraphStateType;
 
 	constructor(private readonly _extensionUri: vscode.Uri) {
-		this._logService = new LogService();
-		this._agentService = new AgentService(this._logService);
+		this._logService = LogService.getInstance();
+		this._agentService = new AgentService();
 		this._fileService = new FileService();
 		
 		// Subscribe to log messages
@@ -221,6 +221,8 @@ export function activate(context: vscode.ExtensionContext) {
 			if (event.affectsConfiguration('durrsor')) {
 				// Refresh the model provider configuration
 				ModelService.getInstance().refreshConfiguration();
+				// Refresh the log service configuration
+				LogService.getInstance().refreshConfiguration();
 				console.log('Durrsor configuration refreshed');
 			}
 		})

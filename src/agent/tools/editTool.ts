@@ -20,10 +20,10 @@ interface DiffApplierOutput {
  * Apply the diff to the specified file.
  * @param file Path to the file to be modified
  * @param diffContent The diff content to be applied
- * @param logService LogService instance for logging
  * @returns Result of the diff application
  */
-async function applyDiff(file: string, diffContent: string, logService: LogService): Promise<DiffApplierOutput> {
+async function applyDiff(file: string, diffContent: string): Promise<DiffApplierOutput> {
+  const logService = LogService.getInstance();
   try {
     const filePath = file;
     const fileService = new FileService();
@@ -106,10 +106,10 @@ async function applyDiff(file: string, diffContent: string, logService: LogServi
  * Create an edit tool that applies diffs to files with automatic line number correction.
  * This tool is designed to work within a VSCode extension context.
  * 
- * @param logService LogService instance for logging
  * @returns DynamicStructuredTool instance
  */
-export function createEditTool(logService: LogService): DynamicStructuredTool<any> {
+export function createEditTool(): DynamicStructuredTool<any> {
+  const logService = LogService.getInstance();
   return new DynamicStructuredTool({
     name: 'edit_tool',
     description: 'Apply diff to an existing file',
@@ -123,7 +123,7 @@ export function createEditTool(logService: LogService): DynamicStructuredTool<an
         diffContent = await fixDiffLineNumbers(filePath, diffContent);
         
         // Apply the fixed diff
-        const result = await applyDiff(filePath, diffContent, logService);
+        const result = await applyDiff(filePath, diffContent);
         return JSON.stringify(result);
       } catch (e) {
         const error = e as Error;

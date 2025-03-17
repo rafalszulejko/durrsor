@@ -17,10 +17,10 @@ interface ReadFileOutput {
 /**
  * Read the contents of the specified file using VSCode API.
  * @param filePath Path to the file to be read (relative to workspace)
- * @param logService LogService instance for logging
  * @returns Result of the file reading operation
  */
-async function readFile(filePath: string, logService: LogService): Promise<ReadFileOutput> {
+async function readFile(filePath: string): Promise<ReadFileOutput> {
+  const logService = LogService.getInstance();
   try {
     const fileService = new FileService();
     const content = await fileService.getFileContent(filePath);
@@ -57,10 +57,10 @@ async function readFile(filePath: string, logService: LogService): Promise<ReadF
  * Create a read file tool that reads contents from files.
  * This tool is designed to work within a VSCode extension context.
  * 
- * @param logService LogService instance for logging
  * @returns DynamicStructuredTool instance
  */
-export function createReadFileTool(logService: LogService): DynamicStructuredTool<any> {
+export function createReadFileTool(): DynamicStructuredTool<any> {
+  const logService = LogService.getInstance();
   return new DynamicStructuredTool({
     name: 'read_file_tool',
     description: 'Read contents from an existing file',
@@ -69,7 +69,7 @@ export function createReadFileTool(logService: LogService): DynamicStructuredToo
     }),
     func: async ({ filePath }) => {
       try {
-        const result = await readFile(filePath, logService);
+        const result = await readFile(filePath);
         return JSON.stringify(result);
       } catch (e) {
         const error = e as Error;
