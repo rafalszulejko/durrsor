@@ -1,13 +1,13 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from 'vscode';
-import * as path from 'path';
 import { AgentService } from './services/agentService';
 import { FileService } from './services/fileService';
 import { GraphStateType } from './agent/graphState';
-import { LogService, LogLevel } from './services/logService';
+import { LogService } from './services/logService';
 import { ToolMessage } from '@langchain/core/messages';
 import { ModelService } from './services/modelService';
+import { getLayout } from './webview/layout';
 
 // WebView provider class for the sidebar panel
 class DurrsorViewProvider implements vscode.WebviewViewProvider {
@@ -66,41 +66,7 @@ class DurrsorViewProvider implements vscode.WebviewViewProvider {
 			vscode.Uri.joinPath(this._extensionUri, 'dist', 'webview', 'styles', 'main.css')
 		);
 		
-		// Use a nonce to only allow specific scripts to be run
-		const nonce = getNonce();
-		
-		return `<!DOCTYPE html>
-		<html lang="en">
-		<head>
-			<meta charset="UTF-8">
-			<meta name="viewport" content="width=device-width, initial-scale=1.0">
-			<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
-			<title>Durrsor</title>
-			<link rel="stylesheet" href="${stylePath}">
-		</head>
-		<body>
-			<div class="chat-container" id="chatContainer"></div>
-			
-			<div class="loading-indicator" id="loadingIndicator">
-				<div class="loading-spinner"></div>
-				<div class="loading-text">Thinking...</div>
-			</div>
-			
-			<div class="input-container">
-				<div class="file-selector" id="fileSelector">
-					<button id="selectFilesButton">Select Files</button>
-					<div id="selectedFiles" class="selected-files"></div>
-				</div>
-				
-				<div class="input-box">
-					<textarea id="promptInput" placeholder="Ask a question..."></textarea>
-					<button id="sendButton">Send</button>
-				</div>
-			</div>
-			
-			<script nonce="${nonce}" src="${scriptPath}"></script>
-		</body>
-		</html>`;
+		return getLayout(webview, getNonce(), stylePath, scriptPath);
 	}
 
 	private async _handleMessage(message: any) {
@@ -227,17 +193,6 @@ export function activate(context: vscode.ExtensionContext) {
 			}
 		})
 	);
-
-	// The command has been defined in the package.json file
-	// Now provide the implementation of the command with registerCommand
-	// The commandId parameter must match the command field in package.json
-	const disposable = vscode.commands.registerCommand('durrsor.helloWorld', () => {
-		// The code you place here will be executed every time your command is executed
-		// Display a message box to the user
-		vscode.window.showInformationMessage('Hello World from durrsor!');
-	});
-
-	context.subscriptions.push(disposable);
 }
 
 // This method is called when your extension is deactivated
