@@ -50,7 +50,7 @@ export const analyze = async (state: GraphStateType) => {
     const msgAny = msg as any;
     if (msgAny.tool_calls) {
       for (const call of msgAny.tool_calls) {
-        if (!state.selected_files.includes(call.args.file_path)) {
+        if (call.args.file_path && call.args.file_path.trim() !== '' && call.args.file_path !== undefined && call.args.file_path !== null) {
           state.selected_files.push(call.args.file_path);
           logService.internal(`Adding file to context: ${call.args.file_path}`);
         }
