@@ -1,4 +1,3 @@
-import { ChatOpenAI } from "@langchain/openai";
 import { GraphStateType } from "../graphState";
 import * as vscode from 'vscode';
 import { LogService } from "../../services/logService";
@@ -6,6 +5,7 @@ import { AIMessage, SystemMessage } from "@langchain/core/messages";
 import { VALIDATION_SUMMARY_PROMPT } from "../prompts/validation";
 import { ConversationMode } from "../types/conversationMode";
 import { GitService } from "../utils/git";
+import { ModelProvider } from "../utils/modelProvider";
 
 /**
  * Validation node that:
@@ -17,9 +17,8 @@ import { GitService } from "../utils/git";
  * @returns Updated state with validation results and possibly updated conversation mode
  */
 export const validation = async (state: GraphStateType, logService: LogService) => {
-  // Get API key from extension settings
-  const config = vscode.workspace.getConfiguration('durrsor');
-  const apiKey = config.get<string>('apiKey') || process.env.OPENAI_API_KEY || '';
+  // Get the model provider instance
+  const modelProvider = ModelProvider.getInstance();
   
   logService.internal("Starting validation of changes...");
   
@@ -93,12 +92,7 @@ export const validation = async (state: GraphStateType, logService: LogService) 
     logService.internal("Diagnostics found problems. Setting conversation mode to VALIDATION_FEEDBACK.");
   } else {
     // No problems found, generate a brief summary using gpt-4o-mini
-    const model = new ChatOpenAI({
-      modelName: "gpt-4o-mini",
-      temperature: 0.2,
-      apiKey: apiKey,
-      streaming: true
-    });
+    const model = modelProvider.getSmallModel(0.2, true);
     
     // Create system message for validation summary
     const systemMessage = new SystemMessage(VALIDATION_SUMMARY_PROMPT);
@@ -111,7 +105,7 @@ export const validation = async (state: GraphStateType, logService: LogService) 
     ];
     
     // Make the LLM call for summary
-    logService.internal("Calling gpt-4o-mini for validation summary...");
+    logService.internal("Calling small model for validation summary...");
     
     const summaryResult = await model.invoke(modelMessages);
     validationResponse = new AIMessage(summaryResult.content.toString());

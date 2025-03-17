@@ -1,13 +1,12 @@
-import { ChatOpenAI } from "@langchain/openai";
 import { createReadFileTool } from "../tools/readFileTool";
 import { createReactAgent } from "@langchain/langgraph/prebuilt";
 import { GraphStateType } from "../graphState";
-import * as vscode from 'vscode';
 import { FileService } from "../../services/fileService";
 import { LogService } from "../../services/logService";
 import { AIMessage, SystemMessage } from "@langchain/core/messages";
 import { ANALYZE_INFO_PROMPT, ANALYZE_CHANGES_PROMPT, CONTEXT_AGENT_PROMPT, VALIDATION_FEEDBACK_PROMPT } from "../prompts/analyze";
 import { ConversationMode } from "../types/conversationMode";
+import { ModelProvider } from "../utils/modelProvider";
 
 /**
  * Analyze node that processes the messages and prepares for code generation.
@@ -16,16 +15,11 @@ import { ConversationMode } from "../types/conversationMode";
  * 2. Refines the user prompt into a precise action plan
  */
 export const analyze = async (state: GraphStateType, logService: LogService) => {
-  const config = vscode.workspace.getConfiguration('durrsor');
-  const apiKey = config.get<string>('apiKey') || process.env.OPENAI_API_KEY || '';
+  // Get the model provider instance
+  const modelProvider = ModelProvider.getInstance();
   
   // Initialize the model with streaming enabled
-  const model = new ChatOpenAI({
-    modelName: "gpt-4o",
-    temperature: 0,
-    apiKey: apiKey,
-    streaming: true
-  });
+  const model = modelProvider.getBigModel(0, true);
   
   // Create the agent for context gathering with streaming enabled
   const tools = [createReadFileTool(logService)];

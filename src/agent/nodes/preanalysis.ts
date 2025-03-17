@@ -1,11 +1,10 @@
-import { BaseMessage, SystemMessage, AIMessage } from "@langchain/core/messages";
-import { ChatOpenAI } from "@langchain/openai";
+import { SystemMessage, AIMessage } from "@langchain/core/messages";
 import { z } from "zod";
-import * as vscode from 'vscode';
 import { GraphStateType } from "../graphState";
 import { LogService } from "../../services/logService";
 import { ConversationMode } from "../types/conversationMode";
 import { PREANALYSIS_SYSTEM_PROMPT, GENERAL_CHAT_SYSTEM_PROMPT, MODE_DETECTION_SYSTEM_PROMPT } from "../prompts/preanalysis";
+import { ModelProvider } from "../utils/modelProvider";
 
 // Define the schema for the mode detection response
 const modeDetectionSchema = z.object({
@@ -15,14 +14,6 @@ const modeDetectionSchema = z.object({
     ConversationMode.CHANGE_REQUEST
   ]).describe("The conversation mode for this interaction")
 });
-
-/**
- * Get the API key from VS Code configuration or environment variables
- */
-const getApiKey = (): string => {
-  const config = vscode.workspace.getConfiguration('durrsor');
-  return config.get<string>('apiKey') || process.env.OPENAI_API_KEY || '';
-};
 
 /**
  * Preanalysis node that:
@@ -37,13 +28,11 @@ const getApiKey = (): string => {
 export const preanalysis = async (state: GraphStateType, logService: LogService) => {
   logService.internal("Starting preanalysis...");
   
+  // Get the model provider instance
+  const modelProvider = ModelProvider.getInstance();
+  
   // Initialize the model for mode detection
-  const modeDetectionModel = new ChatOpenAI({
-    modelName: "gpt-4o-mini", // Using a smaller model for quick classification
-    temperature: 0,
-    streaming: false,
-    apiKey: getApiKey()
-  }).withStructuredOutput(modeDetectionSchema);
+  const modeDetectionModel = modelProvider.getSmallModel(0, false).withStructuredOutput(modeDetectionSchema);
   
   // Make the LLM call to determine conversation mode
   logService.internal("Determining conversation mode...");
@@ -62,12 +51,7 @@ export const preanalysis = async (state: GraphStateType, logService: LogService)
     logService.internal("General chat mode detected, generating complete response...");
     
     // Use a more capable model for the complete response
-    const chatModel = new ChatOpenAI({
-      modelName: "gpt-4o",
-      temperature: 0.7,
-      streaming: true,
-      apiKey: getApiKey()
-    });
+    const chatModel = modelProvider.getBigModel(0.7, true);
     
     // Create a system message for general chat
     const chatSystemMessage = new SystemMessage(GENERAL_CHAT_SYSTEM_PROMPT);
@@ -100,12 +84,7 @@ export const preanalysis = async (state: GraphStateType, logService: LogService)
     logService.internal(`${conversationMode} mode detected, generating initial response...`);
     
     // Use the preanalysis model for the initial response
-    const initialResponseModel = new ChatOpenAI({
-      modelName: "gpt-4o-mini",
-      temperature: 0.2,
-      streaming: true,
-      apiKey: getApiKey()
-    });
+    const initialResponseModel = modelProvider.getSmallModel(0.2, true);
     
     // Create a system message for the initial response
     const initialResponseSystemMessage = new SystemMessage(PREANALYSIS_SYSTEM_PROMPT);
