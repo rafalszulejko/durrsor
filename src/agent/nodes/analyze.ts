@@ -6,7 +6,7 @@ import { LogService } from "../../services/logService";
 import { AIMessage, SystemMessage } from "@langchain/core/messages";
 import { ANALYZE_INFO_PROMPT, ANALYZE_CHANGES_PROMPT, CONTEXT_AGENT_PROMPT, VALIDATION_FEEDBACK_PROMPT } from "../prompts/analyze";
 import { ConversationMode } from "../types/conversationMode";
-import { ModelProvider } from "../utils/modelProvider";
+import { ModelService } from "../../services/modelService";
 
 /**
  * Analyze node that processes the messages and prepares for code generation.
@@ -16,7 +16,7 @@ import { ModelProvider } from "../utils/modelProvider";
  */
 export const analyze = async (state: GraphStateType, logService: LogService) => {
   // Get the model provider instance
-  const modelProvider = ModelProvider.getInstance();
+  const modelProvider = ModelService.getInstance();
   
   // Initialize the model with streaming enabled
   const model = modelProvider.getBigModel(0, true);

@@ -6,7 +6,7 @@ import { LogService, LogLevel } from './logService';
 import { BaseMessage, HumanMessage, SystemMessage, AIMessageChunk, ToolMessage } from '@langchain/core/messages';
 import { GitService } from '../agent/utils/git';
 import { v4 as uuidv4 } from "uuid";
-import { ModelProvider } from '../agent/utils/modelProvider';
+import { ModelService } from './modelService';
 
 export class AgentService {
   private agent: CodeAgent;
@@ -164,7 +164,7 @@ export class AgentService {
     this.logService.thinking("Generating commit message...");
     
     // Get the model provider instance
-    const modelProvider = ModelProvider.getInstance();
+    const modelProvider = ModelService.getInstance();
     
     // Initialize the model
     const model = modelProvider.getBigModel(0, false);

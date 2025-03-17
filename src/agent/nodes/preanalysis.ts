@@ -4,7 +4,7 @@ import { GraphStateType } from "../graphState";
 import { LogService } from "../../services/logService";
 import { ConversationMode } from "../types/conversationMode";
 import { PREANALYSIS_SYSTEM_PROMPT, GENERAL_CHAT_SYSTEM_PROMPT, MODE_DETECTION_SYSTEM_PROMPT } from "../prompts/preanalysis";
-import { ModelProvider } from "../utils/modelProvider";
+import { ModelService } from "../../services/modelService";
 
 // Define the schema for the mode detection response
 const modeDetectionSchema = z.object({
@@ -29,7 +29,7 @@ export const preanalysis = async (state: GraphStateType, logService: LogService)
   logService.internal("Starting preanalysis...");
   
   // Get the model provider instance
-  const modelProvider = ModelProvider.getInstance();
+  const modelProvider = ModelService.getInstance();
   
   // Initialize the model for mode detection
   const modeDetectionModel = modelProvider.getSmallModel(0, false).withStructuredOutput(modeDetectionSchema);

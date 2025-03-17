@@ -11,7 +11,7 @@ import {
   CODE_GENERATION_SYSTEM_PROMPT, 
   APPLY_CHANGES_AGENT_PROMPT 
 } from "../prompts/generate";
-import { ModelProvider } from "../utils/modelProvider";
+import { ModelService } from "../../services/modelService";
 
 /**
  * Generate node that:
@@ -23,7 +23,7 @@ import { ModelProvider } from "../utils/modelProvider";
  */
 export const generate = async (state: GraphStateType, logService: LogService) => {
   // Get the model provider instance
-  const modelProvider = ModelProvider.getInstance();
+  const modelProvider = ModelService.getInstance();
   
   // Initialize the model for the first LLM call with streaming enabled
   const model = modelProvider.getBigModel(0, true);

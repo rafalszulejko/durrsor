@@ -10,8 +10,8 @@ export enum SmallModel {
   GPT_4O_MINI = 'gpt-4o-mini'
 }
 
-export class ModelProvider {
-  private static instance: ModelProvider;
+export class ModelService {
+  private static instance: ModelService;
   
   private selectedBigModel: BigModel = BigModel.GPT_4O;
   private selectedSmallModel: SmallModel = SmallModel.GPT_4O_MINI;
@@ -22,11 +22,11 @@ export class ModelProvider {
     this.loadConfig();
   }
   
-  public static getInstance(): ModelProvider {
-    if (!ModelProvider.instance) {
-      ModelProvider.instance = new ModelProvider();
+  public static getInstance(): ModelService {
+    if (!ModelService.instance) {
+      ModelService.instance = new ModelService();
     }
-    return ModelProvider.instance;
+    return ModelService.instance;
   }
   
   private loadConfig(): void {
