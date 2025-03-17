@@ -6,7 +6,7 @@ import { LogService } from "../../services/logService";
 import { AIMessage, SystemMessage } from "@langchain/core/messages";
 import { ANALYZE_INFO_PROMPT, ANALYZE_CHANGES_PROMPT, CONTEXT_AGENT_PROMPT, VALIDATION_FEEDBACK_PROMPT } from "../prompts/analyze";
 import { ConversationMode } from "../types/conversationMode";
-import { ModelProvider } from "../utils/modelProvider";
+import { ModelProviderService } from "../../services/modelProviderService";
 
 /**
  * Analyze node that processes the messages and prepares for code generation.
@@ -16,7 +16,7 @@ import { ModelProvider } from "../utils/modelProvider";
  */
 export const analyze = async (state: GraphStateType, logService: LogService) => {
   // Get the model provider instance
-  const modelProvider = ModelProvider.getInstance();
+  const modelProvider = ModelProviderService.getInstance();
   
   // Initialize the model with streaming enabled
   const model = modelProvider.getBigModel(0, true);
@@ -73,7 +73,7 @@ export const analyze = async (state: GraphStateType, logService: LogService) => 
   
   logService.internal(`Analyzing code with conversation mode: ${state.conversation_mode}`);
   
-  // Select the appropriate system prompt based on the conversation mode
+  // Select the appropriate system prompt based on the conversation mode and combine with code context
   let systemPrompt;
   if (state.conversation_mode === ConversationMode.VALIDATION_FEEDBACK) {
     systemPrompt = VALIDATION_FEEDBACK_PROMPT;
@@ -82,13 +82,11 @@ export const analyze = async (state: GraphStateType, logService: LogService) => 
   } else {
     systemPrompt = ANALYZE_INFO_PROMPT;
   }
-  const systemMessage = new SystemMessage(systemPrompt);
   
-  // Create messages for the model
+  // Create messages for the model with combined system prompt
   const modelMessages = [
-    systemMessage,
+    new SystemMessage(`${systemPrompt}\n\nBased on this code context:\n\n${gatheredContext}\n\nProvide a detailed analysis according to the instructions.`),
     ...state.messages, // Include the entire conversation history
-    new SystemMessage(`Based on this code context:\n\n${gatheredContext}\n\nProvide a detailed analysis according to the instructions.`)
   ];
   
   // Get the refined response with streaming - use stream() to enable token-by-token streaming

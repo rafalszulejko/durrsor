@@ -6,7 +6,7 @@ import { LogService, LogLevel } from './logService';
 import { BaseMessage, HumanMessage, SystemMessage, AIMessageChunk, ToolMessage } from '@langchain/core/messages';
 import { GitService } from '../agent/utils/git';
 import { v4 as uuidv4 } from "uuid";
-import { ModelProvider } from '../agent/utils/modelProvider';
+import { ModelProviderService } from './modelProviderService';
 
 export class AgentService {
   private agent: CodeAgent;
@@ -164,7 +164,7 @@ export class AgentService {
     this.logService.thinking("Generating commit message...");
     
     // Get the model provider instance
-    const modelProvider = ModelProvider.getInstance();
+    const modelProvider = ModelProviderService.getInstance();
     
     // Initialize the model
     const model = modelProvider.getBigModel(0, false);
@@ -175,9 +175,7 @@ export class AgentService {
     
     // Generate commit message
     const commitMsgResponse = await model.invoke([
-      new SystemMessage("You are an expert at summarizing code changes. Summarize the changes made in the following diff."),
-      new SystemMessage(`User request: ${latestUserMessage.content}`),
-      new SystemMessage(`\`\`\`\n${diff}\n\`\`\``)
+      new SystemMessage(`You are an expert at summarizing code changes. Summarize the changes made in the following diff.\n\nUser request: ${latestUserMessage.content}\n\n\`\`\`\n${diff}\n\`\`\``)
     ]);
     
     this.logService.thinking(`Commit message: ${commitMsgResponse.content}`);

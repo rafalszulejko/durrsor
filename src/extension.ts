@@ -7,7 +7,7 @@ import { FileService } from './services/fileService';
 import { GraphStateType } from './agent/graphState';
 import { LogService, LogLevel } from './services/logService';
 import { ToolMessage } from '@langchain/core/messages';
-import { ModelProvider } from './agent/utils/modelProvider';
+import { ModelProviderService } from './services/modelProviderService';
 
 // WebView provider class for the sidebar panel
 class DurrsorViewProvider implements vscode.WebviewViewProvider {
@@ -220,7 +220,7 @@ export function activate(context: vscode.ExtensionContext) {
 			// Check if our extension's configuration was changed
 			if (event.affectsConfiguration('durrsor')) {
 				// Refresh the model provider configuration
-				ModelProvider.getInstance().refreshConfiguration();
+				ModelProviderService.getInstance().refreshConfiguration();
 				console.log('Durrsor configuration refreshed');
 			}
 		})

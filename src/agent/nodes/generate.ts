@@ -11,7 +11,7 @@ import {
   CODE_GENERATION_SYSTEM_PROMPT, 
   APPLY_CHANGES_AGENT_PROMPT 
 } from "../prompts/generate";
-import { ModelProvider } from "../utils/modelProvider";
+import { ModelProviderService } from "../../services/modelProviderService";
 
 /**
  * Generate node that:
@@ -23,7 +23,7 @@ import { ModelProvider } from "../utils/modelProvider";
  */
 export const generate = async (state: GraphStateType, logService: LogService) => {
   // Get the model provider instance
-  const modelProvider = ModelProvider.getInstance();
+  const modelProvider = ModelProviderService.getInstance();
   
   // Initialize the model for the first LLM call with streaming enabled
   const model = modelProvider.getBigModel(0, true);
@@ -34,13 +34,9 @@ export const generate = async (state: GraphStateType, logService: LogService) =>
   
   logService.internal("Generating code changes based on the analysis...");
   
-  // Create system message for code generation
-  const systemMessage = new SystemMessage(CODE_GENERATION_SYSTEM_PROMPT);
-  
   // Create messages for the model - ONLY use the analysis message, not the entire history
   const modelMessages = [
-    systemMessage,
-    new SystemMessage(`${state.code_context}`),
+    new SystemMessage(`${CODE_GENERATION_SYSTEM_PROMPT}\n\n${state.code_context}`),
     analysisMessage
   ];
   

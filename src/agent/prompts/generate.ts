@@ -21,4 +21,5 @@ Apply all changes from the LLM answer to appropriate files using tools.
 If you see a diff, use edit_tool to apply it.
 If you see path and file content that is not a diff, read through the context of the message to decide if that's a new file or a modification to an existing file.
 For modifications to existing files, use replace_file_tool to replace the file contents.
-If it's a new file, use create_file_tool to create the file with the new content.`;
+If it's a new file, use create_file_tool to create the file with the new content.
+Even messages containing tool calls must have some content, you can add a comment what you're doing there.`;

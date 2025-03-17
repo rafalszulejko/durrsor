@@ -5,7 +5,7 @@ import { AIMessage, SystemMessage } from "@langchain/core/messages";
 import { VALIDATION_SUMMARY_PROMPT } from "../prompts/validation";
 import { ConversationMode } from "../types/conversationMode";
 import { GitService } from "../utils/git";
-import { ModelProvider } from "../utils/modelProvider";
+import { ModelProviderService } from "../../services/modelProviderService";
 
 /**
  * Validation node that:
@@ -18,7 +18,7 @@ import { ModelProvider } from "../utils/modelProvider";
  */
 export const validation = async (state: GraphStateType, logService: LogService) => {
   // Get the model provider instance
-  const modelProvider = ModelProvider.getInstance();
+  const modelProvider = ModelProviderService.getInstance();
   
   logService.internal("Starting validation of changes...");
   
@@ -94,14 +94,9 @@ export const validation = async (state: GraphStateType, logService: LogService) 
     // No problems found, generate a brief summary using gpt-4o-mini
     const model = modelProvider.getSmallModel(0.2, true);
     
-    // Create system message for validation summary
-    const systemMessage = new SystemMessage(VALIDATION_SUMMARY_PROMPT);
-    
-    // Create messages for the model
+    // Create messages for the model with combined system prompt
     const modelMessages = [
-      systemMessage,
-      new SystemMessage(`Last user request: ${lastHumanMessage.content}`),
-      new SystemMessage(`Changes made (diff):\n\n${diff}`)
+      new SystemMessage(`${VALIDATION_SUMMARY_PROMPT}\n\nLast user request: ${lastHumanMessage.content}\n\nChanges made (diff):\n\n${diff}`)
     ];
     
     // Make the LLM call for summary
