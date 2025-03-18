@@ -7,6 +7,7 @@ import { AIMessage, SystemMessage } from "@langchain/core/messages";
 import { ANALYZE_INFO_PROMPT, ANALYZE_CHANGES_PROMPT, CONTEXT_AGENT_PROMPT, VALIDATION_FEEDBACK_PROMPT } from "../prompts/analyze";
 import { ConversationMode } from "../types/conversationMode";
 import { ModelService } from "../../services/modelService";
+import { z } from "zod";
 
 /**
  * Analyze node that processes the messages and prepares for code generation.
@@ -21,14 +22,25 @@ export const analyze = async (state: GraphStateType) => {
   const modelProvider = ModelService.getInstance();
   
   // Initialize the model with streaming enabled
-  const model = modelProvider.getBigModel(0, true);
+  const contextModel = modelProvider.getBigModel(0, false);
   
-  // Create the agent for context gathering with streaming enabled
   const tools = [createReadFileTool()];
+  
+  // Define schema for read files
+  const readFilesSchema = z.object({
+    read_file_paths: z.array(z.string()).describe("A list of file paths read by the agent")
+  });
+  
   const contextAgent = createReactAgent({
-    llm: model,
+    llm: contextModel,
     tools,
-    prompt: CONTEXT_AGENT_PROMPT
+    prompt: CONTEXT_AGENT_PROMPT,
+    responseFormat: { 
+      type: "json_object",
+      prompt: "Full paths of the files read by the agent",
+      schema: readFilesSchema 
+    },
+    name: "ContextAgent"
   });
   
   logService.internal("Starting context analysis...");
@@ -43,20 +55,10 @@ export const analyze = async (state: GraphStateType) => {
 
   let gatheredContext = "";
 
-  // Process all tool call arguments
-  for (const msg of agentResult.messages) {
-    // Check if the message has tool calls (using type assertion with caution)
-    logService.internal(`Processing message from context agent: ${JSON.stringify(msg)}`);
-    const msgAny = msg as any;
-    if (msgAny.tool_calls) {
-      for (const call of msgAny.tool_calls) {
-        if (call.args.file_path && call.args.file_path.trim() !== '' && call.args.file_path !== undefined && call.args.file_path !== null) {
-          state.selected_files.push(call.args.file_path);
-          logService.internal(`Adding file to context: ${call.args.file_path}`);
-        }
-      }
-    }
-  }
+  state.selected_files = Array.from(new Set([
+    ...state.selected_files, 
+    ...agentResult.structuredResponse.read_file_paths
+  ]));
 
   logService.internal(`Selected files for analysis: ${state.selected_files.join(', ')}`);
   const fileService = new FileService();
@@ -92,7 +94,7 @@ export const analyze = async (state: GraphStateType) => {
     ...state.messages, // Include the entire conversation history
     new SystemMessage(`Based on this code context:\n\n${gatheredContext}\n\nProvide a detailed analysis according to the instructions.`)
   ];
-  
+  const model = modelProvider.getBigModel(0, true);
   // Get the refined response with streaming - use stream() to enable token-by-token streaming
   const refinedResponseStream = await model.stream(modelMessages);
   
