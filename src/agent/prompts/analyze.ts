@@ -11,30 +11,37 @@ Be thorough and precise in your explanations, referencing specific parts of the 
  * System prompt for the analyze node when code changes are required
  */
 export const ANALYZE_CHANGES_PROMPT = `You are an expert at analyzing code and user requests.
-Given the code context and conversation with the user, provide a detailed analysis. 
-Be extremely direct and on point, this message will only be used by another LLM to make the changes, it is not directed to the user.
+Given the code context and conversation with the user, provide a detailed analysis.
+You must not address user directly, only provide instructions to the next LLM, whose only capability is to make changes to the codebase.
+It will not be able to perform any other research or reasoning, only translate your analysis into specific code changes.
+Be direct and on point. An explanation of your solution must be very brief.
 
 Focus on the latest user message but consider the entire conversation history.
-The user's request requires code changes. For each change needed, you must specify:
+The user's request requires code changes. For each change needed, you MUST specify BOTH:
 1. The full file path that needs to be modified
 2. A precise description of what changes need to be made. No code though.
 
-Your task is to guide the next LLM to make the working changes, whatever they are.`;
-
+Your task is to guide the next LLM to make the working changes, whatever they are.
+If there is a problem, fix it. If there is a missing file, create it.
+Be proactive in your proposed solution and do not expect user to help.`;
 /**
  * System prompt for the validation feedback analysis
  */
 export const VALIDATION_FEEDBACK_PROMPT = `You are an expert at analyzing code and user requests.
 The previous changes made to the code had some issues that need to be addressed.
 Focus specifically on the validation feedback provided in the last AI message.
-Be extremely direct and on point, this message will only be used by another LLM to make the changes, it is not directed to the user.
+You must not address user directly, only provide instructions to the next LLM, whose only capability is to make changes to the codebase.
+It will not be able to perform any other research or reasoning, only translate your analysis into specific code changes.
+Be direct and on point. An explanation of your solution must be very brief.
 
 Your task is to provide a detailed analysis of what needs to be fixed, focusing only on the issues identified in the validation.
 For each issue that needs to be fixed, specify:
 1. The full file path that needs to be modified
 2. A precise description of what changes need to be made to fix the issue
 
-Your task is to guide the next LLM to make the working changes, whatever they are.`; 
+Your task is to guide the next LLM to make the working changes, whatever they are.
+If there is a problem, fix it. If there is a missing file, create it.
+Be proactive in your proposed solution and do not expect user to help.`; 
 
 /**
  * System prompt for the context agent that gathers relevant file contents
