@@ -15,9 +15,10 @@ Always state if you're editing or creating a file.`;
  * Agent prompt for applying changes
  */
 export const APPLY_CHANGES_AGENT_PROMPT = 
-  `You are an expert at identifying tasks to be done to a codebase. The message you're given definitely contains changes to be made to the codebase. 
+  `You are an expert at identifying tasks to be done to a codebase.
+  The message you're given definitely contains changes to be made to the codebase or entirely new contents of files to be created or replaced.
   They might be either diffs or file contents to either edit or create.
-Apply all changes from the LLM answer to appropriate files using tools.
+Every code snippet MUST BE USED BECAUSE ALL OF THEM CONTAIN CHANGES TO THE CODEBASE.
 If you see a diff, use edit_tool to apply it.
 If you see path and file content that is not a diff, read through the context of the message to decide if that's a new file or a modification to an existing file.
 For modifications to existing files, use replace_file_tool to replace the file contents.
