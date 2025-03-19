@@ -1,13 +1,17 @@
 import { createReadFileTool } from "../tools/readFileTool";
+import { createListDirTool } from "../tools/listDirTool";
+import { createSearchFileTool } from "../tools/searchFileTool";
 import { createReactAgent } from "@langchain/langgraph/prebuilt";
 import { GraphStateType } from "../graphState";
 import { FileService } from "../../services/fileService";
 import { LogService } from "../../services/logService";
-import { AIMessage, SystemMessage } from "@langchain/core/messages";
+import { AIMessage, SystemMessage, isAIMessage } from "@langchain/core/messages";
 import { ANALYZE_INFO_PROMPT, ANALYZE_CHANGES_PROMPT, CONTEXT_AGENT_PROMPT, VALIDATION_FEEDBACK_PROMPT } from "../prompts/analyze";
 import { ConversationMode } from "../types/conversationMode";
 import { ModelService } from "../../services/modelService";
 import { z } from "zod";
+import { MemorySaver } from "@langchain/langgraph/web";
+import { randomInt } from "crypto";
 
 /**
  * Analyze node that processes the messages and prepares for code generation.
@@ -24,7 +28,7 @@ export const analyze = async (state: GraphStateType) => {
   // Initialize the model with streaming enabled
   const contextModel = modelProvider.getBigModel(0, false);
   
-  const tools = [createReadFileTool()];
+  const tools = [createReadFileTool(), createListDirTool(), createSearchFileTool()];
   
   // Define schema for read files
   const readFilesSchema = z.object({
@@ -40,7 +44,8 @@ export const analyze = async (state: GraphStateType) => {
       prompt: "Full paths of the files read by the agent",
       schema: readFilesSchema 
     },
-    name: "ContextAgent"
+    name: "ContextAgent",
+    checkpointer: new MemorySaver()
   });
   
   logService.internal("Starting context analysis...");
@@ -51,7 +56,27 @@ export const analyze = async (state: GraphStateType) => {
       ...state.messages, // Pass the entire conversation history
       { role: "user", content: `Selected files: ${state.selected_files.join(', ')}` }
     ]
+  },
+  {
+      configurable: {
+        thread_id: randomInt(1, 1000000)
+      }
   });
+  logService.internal(`Context agent result: ${JSON.stringify(agentResult, null, 2)}`);
+
+  // Extract the last non-structured AI message from the context agent
+  let contextAgentMessage: AIMessage | null = null;
+  if (agentResult.messages && agentResult.messages.length > 0) {
+    // Find the last AI message that isn't a tool response
+    for (let i = agentResult.messages.length - 1; i >= 0; i--) {
+      const message = agentResult.messages[i];
+      if (isAIMessage(message) && message.content && typeof message.content === 'string') {
+        contextAgentMessage = new AIMessage(message.content);
+        logService.thinking(`Extracted context agent message: ${message.content}`);
+        break;
+      }
+    }
+  }
 
   let gatheredContext = "";
 
@@ -92,6 +117,7 @@ export const analyze = async (state: GraphStateType) => {
   const modelMessages = [
     systemMessage,
     ...state.messages, // Include the entire conversation history
+    ...(contextAgentMessage ? [contextAgentMessage] : []),
     new SystemMessage(`Based on this code context:\n\n${gatheredContext}\n\nProvide a detailed analysis according to the instructions.`)
   ];
   const model = modelProvider.getBigModel(0, true);
@@ -118,13 +144,13 @@ export const analyze = async (state: GraphStateType) => {
     const fallbackResponse = await model.invoke(modelMessages);
     return {
       code_context: gatheredContext,
-      messages: [...state.messages, fallbackResponse]
+      messages: [...state.messages, contextAgentMessage, fallbackResponse].filter(Boolean)
     };
   }
   
-  // Return updated state with the AI message
+  // Return updated state with the AI messages
   return {
     code_context: gatheredContext,
-    messages: [...state.messages, refinedResponse]
+    messages: [...state.messages, contextAgentMessage, refinedResponse].filter(Boolean)
   };
 }; 

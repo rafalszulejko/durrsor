@@ -154,4 +154,66 @@ export class FileService {
       throw new Error(`Failed to create file: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
+
+  /**
+   * List contents of a directory
+   * 
+   * @param dirPath Path to directory (relative to workspace)
+   * @returns Array of objects containing path and type (file or folder)
+   * @throws Error if the directory does not exist or is not a directory
+   */
+  async listDirectoryContents(dirPath: string): Promise<Array<{ path: string; type: 'file' | 'folder' }>> {
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders) {
+      throw new Error('No workspace folder found');
+    }
+    
+    // If empty path, list workspace root
+    if (!dirPath || dirPath === '.') {
+      dirPath = '';
+    }
+    
+    // Create URI for the directory
+    const dirUri = vscode.Uri.joinPath(workspaceFolders[0].uri, dirPath);
+    
+    try {
+      // First check if path exists
+      const stat = await vscode.workspace.fs.stat(dirUri);
+      
+      // Verify it's a directory
+      if (!(stat.type & vscode.FileType.Directory)) {
+        throw new Error(`Path is not a directory: ${dirPath}`);
+      }
+      
+      // Get directory contents
+      const entries = await vscode.workspace.fs.readDirectory(dirUri);
+      
+      // Map entries to desired format
+      return entries.map(([name, fileType]) => {
+        const entryPath = dirPath ? `${dirPath}/${name}` : name;
+        const type = fileType & vscode.FileType.Directory ? 'folder' : 'file';
+        return {
+          path: entryPath,
+          type
+        };
+      });
+    } catch (error) {
+      console.error(`Error listing directory ${dirPath}:`, error);
+      throw new Error(`Failed to list directory: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  async searchFilesByName(pattern: string, excludePattern?: string, maxResults?: number): Promise<string[]> {
+    if (!pattern) {
+      return [];
+    }
+    
+    try {
+      const files = await vscode.workspace.findFiles(pattern, excludePattern, maxResults);
+      return files.map(file => vscode.workspace.asRelativePath(file));
+    } catch (error) {
+      console.error(`Error searching files with pattern ${pattern}:`, error);
+      return [];
+    }
+  }
 } 

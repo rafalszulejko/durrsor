@@ -38,6 +38,10 @@ export function getComponentForMessage(message: BaseMessage, selectedFiles?: str
     switch (toolName) {
       case 'read_file_tool':
         return new FileToolComponent(message, 'Read file');
+      case 'list_dir_tool':
+        return new FileToolComponent(message, 'List directory');
+      case 'search_file_tool':
+        return new FileToolComponent(message, 'File search');
       case 'edit_tool':
       case 'replace_file_tool':
         return new FileToolComponent(message, 'Apply changes');
