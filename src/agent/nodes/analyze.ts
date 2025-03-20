@@ -1,12 +1,17 @@
 import { createReadFileTool } from "../tools/readFileTool";
+import { createListDirTool } from "../tools/listDirTool";
+import { createSearchFileTool } from "../tools/searchFileTool";
 import { createReactAgent } from "@langchain/langgraph/prebuilt";
 import { GraphStateType } from "../graphState";
 import { FileService } from "../../services/fileService";
 import { LogService } from "../../services/logService";
-import { AIMessage, SystemMessage } from "@langchain/core/messages";
+import { AIMessage, SystemMessage, isAIMessage } from "@langchain/core/messages";
 import { ANALYZE_INFO_PROMPT, ANALYZE_CHANGES_PROMPT, CONTEXT_AGENT_PROMPT, VALIDATION_FEEDBACK_PROMPT } from "../prompts/analyze";
 import { ConversationMode } from "../types/conversationMode";
 import { ModelService } from "../../services/modelService";
+import { z } from "zod";
+import { MemorySaver } from "@langchain/langgraph/web";
+import { randomInt } from "crypto";
 
 /**
  * Analyze node that processes the messages and prepares for code generation.
@@ -21,55 +26,77 @@ export const analyze = async (state: GraphStateType) => {
   const modelProvider = ModelService.getInstance();
   
   // Initialize the model with streaming enabled
-  const model = modelProvider.getBigModel(0, true);
+  const contextModel = modelProvider.getBigModel(0, false);
   
-  // Create the agent for context gathering with streaming enabled
-  const tools = [createReadFileTool()];
+  const tools = [createReadFileTool(), createListDirTool(), createSearchFileTool()];
+  
+  // Define schema for read files
+  const readFilesSchema = z.object({
+    read_file_paths: z.array(z.string()).describe("A list of file paths read by the agent")
+  });
+  
+  // Initialize FileService and read content of selected files
+  const fileService = new FileService();
+  // Get content of selected files
+  const selectedFilesContent = await fileService.getMultipleFilesContent(state.selected_files);
+  
   const contextAgent = createReactAgent({
-    llm: model,
+    llm: contextModel,
     tools,
-    prompt: CONTEXT_AGENT_PROMPT
+    prompt:  `${CONTEXT_AGENT_PROMPT}\n\nHere are files that the user has selected. No need to read them again:\n${selectedFilesContent}`,
+    responseFormat: { 
+      type: "json_object",
+      prompt: "Full paths of the files read by the agent",
+      schema: readFilesSchema 
+    },
+    name: "ContextAgent",
+    checkpointer: new MemorySaver()
   });
   
   logService.internal("Starting context analysis...");
   
-  // Run the agent to gather context
+  // Run the agent to gather context without passing selected files in the message
   const agentResult = await contextAgent.invoke({
     messages: [
-      ...state.messages, // Pass the entire conversation history
-      { role: "user", content: `Selected files: ${state.selected_files.join(', ')}` }
+      ...state.messages // Pass only the conversation history
     ]
-  });
-
-  let gatheredContext = "";
-
-  // Process all tool call arguments
-  for (const msg of agentResult.messages) {
-    // Check if the message has tool calls (using type assertion with caution)
-    logService.internal(`Processing message from context agent: ${JSON.stringify(msg)}`);
-    const msgAny = msg as any;
-    if (msgAny.tool_calls) {
-      for (const call of msgAny.tool_calls) {
-        if (!state.selected_files.includes(call.args.file_path)) {
-          state.selected_files.push(call.args.file_path);
-          logService.internal(`Adding file to context: ${call.args.file_path}`);
-        }
+  },
+  {
+      configurable: {
+        thread_id: randomInt(1, 1000000)
       }
-    }
-  }
+  });
+  logService.internal(`Context agent result: ${JSON.stringify(agentResult, null, 2)}`);
 
-  logService.internal(`Selected files for analysis: ${state.selected_files.join(', ')}`);
-  const fileService = new FileService();
+  const contextAgentMessage = agentResult.messages
+    .filter(msg => isAIMessage(msg) && msg.content && typeof msg.content === 'string')
+    .pop();
+  
+  logService.thinking(`Extracted context agent message: ${contextAgentMessage?.content}`);
 
-  // Read content of all selected files
-  for (const file of state.selected_files) {
+  let gatheredContext = selectedFilesContent; // Start with the already read selected files
+
+  // Add additional files from agent response
+  const additionalFiles = agentResult.structuredResponse.read_file_paths.filter(
+    file => !state.selected_files.includes(file)
+  );
+  
+  state.selected_files = Array.from(new Set([
+    ...state.selected_files, 
+    ...agentResult.structuredResponse.read_file_paths
+  ]));
+
+  logService.internal(`Additional files discovered: ${additionalFiles.join(', ')}`);
+  
+  // Read content of additional files found by the agent
+  for (const file of additionalFiles) {
     try {
       const content = await fileService.getFileContent(file);
       gatheredContext += `${file}\n\`\`\`\n${content}\n\`\`\`\n\n`;
-      logService.internal(`Read file: ${file}`);
+      logService.internal(`Read additional file: ${file}`);
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      logService.error('analyze', `Error reading file ${file}: ${errorMessage}`);
+      logService.error('analyze', `Error reading additional file ${file}: ${errorMessage}`);
     }
   }
   
@@ -86,13 +113,13 @@ export const analyze = async (state: GraphStateType) => {
   }
   const systemMessage = new SystemMessage(systemPrompt);
   
-  // Create messages for the model
   const modelMessages = [
     systemMessage,
-    ...state.messages, // Include the entire conversation history
+    ...state.messages,
+    ...(contextAgentMessage ? [contextAgentMessage] : []),
     new SystemMessage(`Based on this code context:\n\n${gatheredContext}\n\nProvide a detailed analysis according to the instructions.`)
   ];
-  
+  const model = modelProvider.getBigModel(0, true);
   // Get the refined response with streaming - use stream() to enable token-by-token streaming
   const refinedResponseStream = await model.stream(modelMessages);
   
@@ -116,13 +143,12 @@ export const analyze = async (state: GraphStateType) => {
     const fallbackResponse = await model.invoke(modelMessages);
     return {
       code_context: gatheredContext,
-      messages: [...state.messages, fallbackResponse]
+      messages: [...state.messages, contextAgentMessage, fallbackResponse]
     };
   }
   
-  // Return updated state with the AI message
   return {
     code_context: gatheredContext,
-    messages: [...state.messages, refinedResponse]
+    messages: [...state.messages, contextAgentMessage, refinedResponse]
   };
 }; 
