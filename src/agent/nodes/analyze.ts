@@ -40,13 +40,10 @@ export const analyze = async (state: GraphStateType) => {
   // Get content of selected files
   const selectedFilesContent = await fileService.getMultipleFilesContent(state.selected_files);
   
-  // Create a modified prompt that includes the selected files content
-  const enhancedContextPrompt = `${CONTEXT_AGENT_PROMPT}\n\nSelected files content:\n${selectedFilesContent}`;
-  
   const contextAgent = createReactAgent({
     llm: contextModel,
     tools,
-    prompt: enhancedContextPrompt,
+    prompt:  `${CONTEXT_AGENT_PROMPT}\n\nSelected files content:\n${selectedFilesContent}`,
     responseFormat: { 
       type: "json_object",
       prompt: "Full paths of the files read by the agent",
@@ -71,19 +68,11 @@ export const analyze = async (state: GraphStateType) => {
   });
   logService.internal(`Context agent result: ${JSON.stringify(agentResult, null, 2)}`);
 
-  // Extract the last non-structured AI message from the context agent
-  let contextAgentMessage: AIMessage | null = null;
-  if (agentResult.messages && agentResult.messages.length > 0) {
-    // Find the last AI message that isn't a tool response
-    for (let i = agentResult.messages.length - 1; i >= 0; i--) {
-      const message = agentResult.messages[i];
-      if (isAIMessage(message) && message.content && typeof message.content === 'string') {
-        contextAgentMessage = new AIMessage(message.content);
-        logService.thinking(`Extracted context agent message: ${message.content}`);
-        break;
-      }
-    }
-  }
+  const contextAgentMessage = agentResult.messages
+    .filter(msg => isAIMessage(msg) && msg.content && typeof msg.content === 'string')
+    .pop();
+  
+  logService.thinking(`Extracted context agent message: ${contextAgentMessage?.content}`);
 
   let gatheredContext = selectedFilesContent; // Start with the already read selected files
 
@@ -124,10 +113,9 @@ export const analyze = async (state: GraphStateType) => {
   }
   const systemMessage = new SystemMessage(systemPrompt);
   
-  // Create messages for the model
   const modelMessages = [
     systemMessage,
-    ...state.messages, // Include the entire conversation history
+    ...state.messages,
     ...(contextAgentMessage ? [contextAgentMessage] : []),
     new SystemMessage(`Based on this code context:\n\n${gatheredContext}\n\nProvide a detailed analysis according to the instructions.`)
   ];
@@ -155,13 +143,12 @@ export const analyze = async (state: GraphStateType) => {
     const fallbackResponse = await model.invoke(modelMessages);
     return {
       code_context: gatheredContext,
-      messages: [...state.messages, contextAgentMessage, fallbackResponse].filter(Boolean)
+      messages: [...state.messages, contextAgentMessage, fallbackResponse]
     };
   }
   
-  // Return updated state with the AI messages
   return {
     code_context: gatheredContext,
-    messages: [...state.messages, contextAgentMessage, refinedResponse].filter(Boolean)
+    messages: [...state.messages, contextAgentMessage, refinedResponse]
   };
 }; 
