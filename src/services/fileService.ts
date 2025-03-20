@@ -203,6 +203,28 @@ export class FileService {
     }
   }
 
+  /**
+   * Get content of multiple files and format them with filename and content
+   * 
+   * @param files Array of file paths (relative to workspace)
+   * @returns Formatted string containing filename and content of each file
+   */
+  async getMultipleFilesContent(files: string[]): Promise<string> {
+    let formattedContent = "";
+    
+    for (const file of files) {
+      try {
+        const content = await this.getFileContent(file);
+        formattedContent += `${file}\n\`\`\`\n${content}\n\`\`\`\n\n`;
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.error(`Error reading file ${file}: ${errorMessage}`);
+      }
+    }
+    
+    return formattedContent;
+  }
+
   async searchFilesByName(pattern: string, excludePattern?: string, maxResults?: number): Promise<string[]> {
     if (!pattern) {
       return [];

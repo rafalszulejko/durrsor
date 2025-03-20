@@ -37,18 +37,8 @@ export const analyze = async (state: GraphStateType) => {
   
   // Initialize FileService and read content of selected files
   const fileService = new FileService();
-  let selectedFilesContent = "";
-  
-  for (const file of state.selected_files) {
-    try {
-      const content = await fileService.getFileContent(file);
-      selectedFilesContent += `${file}\n\`\`\`\n${content}\n\`\`\`\n\n`;
-      logService.internal(`Read selected file: ${file}`);
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      logService.error('analyze', `Error reading selected file ${file}: ${errorMessage}`);
-    }
-  }
+  // Get content of selected files
+  const selectedFilesContent = await fileService.getMultipleFilesContent(state.selected_files);
   
   // Create a modified prompt that includes the selected files content
   const enhancedContextPrompt = `${CONTEXT_AGENT_PROMPT}\n\nSelected files content:\n${selectedFilesContent}`;
