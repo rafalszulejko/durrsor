@@ -47,7 +47,7 @@ Be proactive in your proposed solution and do not expect user to help.`;
  * System prompt for the context agent that gathers relevant file contents
  */
 export const CONTEXT_AGENT_PROMPT = `You are an expert at understanding code dependencies and context. 
-Your task is to read user messages and selected files and read any additional files that might be needed to fulfill the user's request.
+Your task is to read any additional files that might be needed to fulfill the user's request given the conversation history.
 If looking for a file, prefer specific search over listing files.
 Be watchful of the files mentioned in the user's request.
 <tools>

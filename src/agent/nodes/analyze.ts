@@ -35,10 +35,28 @@ export const analyze = async (state: GraphStateType) => {
     read_file_paths: z.array(z.string()).describe("A list of file paths read by the agent")
   });
   
+  // Initialize FileService and read content of selected files
+  const fileService = new FileService();
+  let selectedFilesContent = "";
+  
+  for (const file of state.selected_files) {
+    try {
+      const content = await fileService.getFileContent(file);
+      selectedFilesContent += `${file}\n\`\`\`\n${content}\n\`\`\`\n\n`;
+      logService.internal(`Read selected file: ${file}`);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logService.error('analyze', `Error reading selected file ${file}: ${errorMessage}`);
+    }
+  }
+  
+  // Create a modified prompt that includes the selected files content
+  const enhancedContextPrompt = `${CONTEXT_AGENT_PROMPT}\n\nSelected files content:\n${selectedFilesContent}`;
+  
   const contextAgent = createReactAgent({
     llm: contextModel,
     tools,
-    prompt: CONTEXT_AGENT_PROMPT,
+    prompt: enhancedContextPrompt,
     responseFormat: { 
       type: "json_object",
       prompt: "Full paths of the files read by the agent",
@@ -50,11 +68,10 @@ export const analyze = async (state: GraphStateType) => {
   
   logService.internal("Starting context analysis...");
   
-  // Run the agent to gather context
+  // Run the agent to gather context without passing selected files in the message
   const agentResult = await contextAgent.invoke({
     messages: [
-      ...state.messages, // Pass the entire conversation history
-      { role: "user", content: `Selected files: ${state.selected_files.join(', ')}` }
+      ...state.messages // Pass only the conversation history
     ]
   },
   {
@@ -78,25 +95,29 @@ export const analyze = async (state: GraphStateType) => {
     }
   }
 
-  let gatheredContext = "";
+  let gatheredContext = selectedFilesContent; // Start with the already read selected files
 
+  // Add additional files from agent response
+  const additionalFiles = agentResult.structuredResponse.read_file_paths.filter(
+    file => !state.selected_files.includes(file)
+  );
+  
   state.selected_files = Array.from(new Set([
     ...state.selected_files, 
     ...agentResult.structuredResponse.read_file_paths
   ]));
 
-  logService.internal(`Selected files for analysis: ${state.selected_files.join(', ')}`);
-  const fileService = new FileService();
-
-  // Read content of all selected files
-  for (const file of state.selected_files) {
+  logService.internal(`Additional files discovered: ${additionalFiles.join(', ')}`);
+  
+  // Read content of additional files found by the agent
+  for (const file of additionalFiles) {
     try {
       const content = await fileService.getFileContent(file);
       gatheredContext += `${file}\n\`\`\`\n${content}\n\`\`\`\n\n`;
-      logService.internal(`Read file: ${file}`);
+      logService.internal(`Read additional file: ${file}`);
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      logService.error('analyze', `Error reading file ${file}: ${errorMessage}`);
+      logService.error('analyze', `Error reading additional file ${file}: ${errorMessage}`);
     }
   }
   
