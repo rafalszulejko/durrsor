@@ -43,7 +43,7 @@ export const analyze = async (state: GraphStateType) => {
   const contextAgent = createReactAgent({
     llm: contextModel,
     tools,
-    prompt:  `${CONTEXT_AGENT_PROMPT}\n\nSelected files content:\n${selectedFilesContent}`,
+    prompt:  `${CONTEXT_AGENT_PROMPT}\n\nHere are files that the user has selected. No need to read them again:\n${selectedFilesContent}`,
     responseFormat: { 
       type: "json_object",
       prompt: "Full paths of the files read by the agent",
