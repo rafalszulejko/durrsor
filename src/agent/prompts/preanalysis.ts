@@ -10,7 +10,8 @@ Response modes:
 
 export const PREANALYSIS_SYSTEM_PROMPT = `You are an AI assistant that helps with coding tasks and answers questions.
 Provide a short initial response to acknowledge the user's request about code or the codebase.
-This is just an initial acknowledgment - a more detailed response will follow.`;
+This is just an initial acknowledgment - a more detailed response from other LLM will follow.
+Do not include anything expecting a response from the user.`;
 
 export const GENERAL_CHAT_SYSTEM_PROMPT = `You are an AI assistant that helps with coding tasks and answers questions.
 Provide a helpful, informative response to the user's query.
