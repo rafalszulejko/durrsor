@@ -1,55 +1,10 @@
-/**
- * System prompt for the analyze node when no code changes are required
- */
-export const ANALYZE_INFO_PROMPT = `You are an expert at analyzing code and user requests.
-Given the code context and conversation with the user, provide a detailed analysis. Focus on the latest user message but consider the entire conversation history.
-Your task is to provide relevant information or explanations based on the user's request.
-Do not suggest any code changes, as the user is only looking for information or explanation.
-Be thorough and precise in your explanations, referencing specific parts of the code when relevant.`;
+import { ConversationMode } from "../types/conversationMode";
+import { LogService } from "../../services/logService";
 
-/**
- * System prompt for the analyze node when code changes are required
- */
-export const ANALYZE_CHANGES_PROMPT = `You are an expert at analyzing code and user requests.
-Given the code context and conversation with the user, provide a detailed analysis.
-You must not address user directly, only provide instructions to the next LLM, whose only capability is to make changes to the codebase.
-It will not be able to perform any other research or reasoning, only translate your analysis into specific code changes.
-Be direct and on point. An explanation of your solution must be very brief.
+// Common prompt elements for reuse
+const COMMON_HEADER = `You are an expert at analyzing code and user requests.`;
 
-Focus on the latest user message but consider the entire conversation history.
-The user's request requires code changes. For each change needed, you MUST specify BOTH:
-1. The full file path that needs to be modified
-2. A precise description of what changes need to be made. No code though.
-
-Your task is to guide the next LLM to make the working changes, whatever they are.
-If there is a problem, fix it. If there is a missing file, create it.
-Be proactive in your proposed solution and do not expect user to help.`;
-/**
- * System prompt for the validation feedback analysis
- */
-export const VALIDATION_FEEDBACK_PROMPT = `You are an expert at analyzing code and user requests.
-The previous changes made to the code had some issues that need to be addressed.
-Focus specifically on the validation feedback provided in the last AI message.
-You must not address user directly, only provide instructions to the next LLM, whose only capability is to make changes to the codebase.
-It will not be able to perform any other research or reasoning, only translate your analysis into specific code changes.
-Be direct and on point. An explanation of your solution must be very brief.
-
-Your task is to provide a detailed analysis of what needs to be fixed, focusing only on the issues identified in the validation.
-For each issue that needs to be fixed, specify:
-1. The full file path that needs to be modified
-2. A precise description of what changes need to be made to fix the issue
-
-Your task is to guide the next LLM to make the working changes, whatever they are.
-If there is a problem, fix it. If there is a missing file, create it.
-Be proactive in your proposed solution and do not expect user to help.`; 
-
-/**
- * System prompt for the context agent that gathers relevant file contents
- */
-export const CONTEXT_AGENT_PROMPT = `You are an expert at understanding code dependencies and context. 
-Your task is to read any additional files that might be needed to fulfill the user's request given the conversation history.
-If looking for a file, prefer specific search over listing files.
-Be watchful of the files mentioned in the user's request.
+const TOOL_INSTRUCTIONS = `
 <tools>
 <tool name="read_file_tool">
 You can read files using the read_file_tool.
@@ -62,8 +17,93 @@ You can use list_dir_tool up to 3 times between file reads. If you can't find an
 You can search for specific files by name using the search_file_tool. If you can't find the file, assume it doesn't exist.
 Make sure the search query doesn't include slashes.
 </tool>
-</tools>
-Use tool calls only, and when you are done, respond ONLY with 'Context gathering complete.' in case of success and a very brief and precise message in case of failure.
-If you were searching for a specific file and couldn't find it, say which particular file does not exist.
-Do not say anything about ensuring the file exists, if the file doesn't exist, it doesn't exist.
-Rest of the process will be handled by another LLM.`;
+</tools>`;
+
+const CONTEXT_GATHERING_INSTRUCTIONS = `
+First use tool calls to gather any necessary context about the codebase.
+When you've gathered enough context to properly analyze the request, STOP making tool calls.
+If looking for a file, prefer specific search over listing files.
+If you were searching for a specific file and couldn't find it, simply state that it doesn't exist.
+`;
+
+/**
+ * Builds a coherent prompt for the context agent based on conversation mode
+ * 
+ * @param mode The current conversation mode
+ * @param logThinking If true, logs generated prompt with thinking level, otherwise uses internal level
+ * @param selectedFilesContent Optional content of files already selected by the user
+ * @returns A complete agent prompt combining context gathering and appropriate analysis instructions
+ */
+export function buildContextAgentPrompt(
+  mode: ConversationMode, 
+  logThinking: boolean = false,
+  selectedFilesContent?: string
+): string {
+  const logService = LogService.getInstance();
+  
+  let analysisInstructions = '';
+  let analysisGoal = '';
+  
+  // Select the appropriate analysis instructions based on the conversation mode
+  if (mode === ConversationMode.VALIDATION_FEEDBACK) {
+    analysisInstructions = `
+Focus specifically on the validation feedback provided in the last AI message.
+Do not address the user directly, only provide instructions to the next LLM that will make code changes.
+For each issue that needs to be fixed, specify:
+1. The full file path that needs to be modified
+2. A precise description of what changes need to be made to fix the issue`;
+    
+    analysisGoal = `Your goal is to analyze issues from validation feedback and provide specific instructions for fixing them.`;
+  } 
+  else if (mode === ConversationMode.CHANGE_REQUEST) {
+    analysisInstructions = `
+Focus on the latest user message but consider the entire conversation history.
+Do not address the user directly, only provide instructions to the next LLM that will make code changes.
+For each change needed, you MUST specify BOTH:
+1. The full file path that needs to be modified
+2. A precise description of what changes need to be made. No code though.`;
+    
+    analysisGoal = `Your goal is to analyze the user's change request and provide specific instructions for implementing it.`;
+  } 
+  else {
+    analysisInstructions = `
+Focus on the latest user message but consider the entire conversation history.
+Provide relevant information or explanations based on the user's request.
+Do not suggest any code changes, as the user is only looking for information or explanation.
+Be thorough and precise in your explanations, referencing specific parts of the code when relevant.`;
+    
+    analysisGoal = `Your goal is to provide information about the code without suggesting changes.`;
+  }
+  
+  // Build the base prompt
+  const basePrompt = `${COMMON_HEADER}
+
+${analysisGoal}
+
+You need to complete two tasks:
+1. Gather relevant code context using available tools
+2. Provide a detailed analysis based on the gathered context
+
+${TOOL_INSTRUCTIONS}
+
+${CONTEXT_GATHERING_INSTRUCTIONS}
+
+After gathering context, analyze the code and respond to the user's query with a detailed analysis.
+${analysisInstructions}
+
+Be thorough in your analysis and proactive in your proposed solutions.`;
+
+  // Log the base prompt
+  if (logThinking) {
+    logService.thinking(`Generated base context agent prompt:\n${basePrompt}`);
+  } else {
+    logService.internal(`Generated base context agent prompt:\n${basePrompt}`);
+  }
+  
+  // Add selected files content if provided
+  if (selectedFilesContent) {
+    return `${basePrompt}\n\nHere are files that the user has selected. No need to read them again:\n${selectedFilesContent}`;
+  }
+  
+  return basePrompt;
+}
