@@ -16,13 +16,20 @@ export function getLayout(webview: vscode.Webview, nonce: string, stylePath: vsc
 			
 			<div class="input-container">
 				<div class="file-selector" id="fileSelector">
-					<button id="selectFilesButton">Select Files</button>
 					<div id="selectedFiles" class="selected-files"></div>
 				</div>
 				
-				<div class="input-box">
+				<div class="prompt-container">
 					<textarea id="promptInput" placeholder="Ask a question..."></textarea>
-					<button id="sendButton">Send</button>
+					<div class="controls-panel">
+						<button id="selectFilesButton" class="file-select-button">
+							<span class="codicon codicon-add"></span>
+						</button>
+						<div id="modelInfo" class="model-info">
+							<span id="smallModelName"></span> | <span id="bigModelName"></span>
+						</div>
+						<div id="sendButtonContainer"></div>
+					</div>
 				</div>
 			</div>
 			

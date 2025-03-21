@@ -54,6 +54,13 @@ class DurrsorViewProvider implements vscode.WebviewViewProvider {
 		
 		// Load webview content
 		webviewView.webview.html = this._getHtmlForWebview(webviewView.webview);
+		
+		// Send initial model information once the webview is loaded
+		webviewView.onDidChangeVisibility(() => {
+			if (webviewView.visible) {
+				this._sendModelInfo();
+			}
+		});
 	}
 
 	private _getHtmlForWebview(webview: vscode.Webview) {
@@ -81,6 +88,9 @@ class DurrsorViewProvider implements vscode.WebviewViewProvider {
 				break;
 			case 'selectFiles':
 				await this._handleFileSelection();
+				break;
+			case 'getModelInfo':
+				this._sendModelInfo();
 				break;
 		}
 	}
@@ -168,6 +178,15 @@ class DurrsorViewProvider implements vscode.WebviewViewProvider {
 			console.error('Error selecting files:', error);
 			vscode.window.showErrorMessage('Error selecting files: ' + error.message);
 		}
+	}
+
+	private _sendModelInfo() {
+		const modelService = ModelService.getInstance();
+		this._view?.webview.postMessage({
+			command: 'modelInfo',
+			smallModel: modelService.getSmallModelName(),
+			bigModel: modelService.getBigModelName()
+		});
 	}
 }
 

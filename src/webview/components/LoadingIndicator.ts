@@ -25,9 +25,11 @@ export class LoadingIndicator {
     if (this.isLoading) {
       this.element.innerHTML = '<span class="codicon codicon-loading codicon-modifier-spin"></span>';
       this.element.setAttribute('disabled', 'true');
+      this.element.title = 'Processing...';
     } else {
       this.element.innerHTML = '<span class="codicon codicon-send"></span>';
       this.element.removeAttribute('disabled');
+      this.element.title = 'Send message';
     }
   }
 } 

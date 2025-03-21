@@ -59,34 +59,87 @@ body {
   opacity: 1;
 }
 
-/* Input box */
-.input-box {
+/* Prompt container - new section to replace input-box */
+.prompt-container {
   display: flex;
-  gap: 8px;
-}
-
-#promptInput {
-  flex: 1;
-  min-height: 60px;
-  resize: vertical;
+  flex-direction: column;
   background-color: var(--vscode-input-background);
-  color: var(--vscode-input-foreground);
   border: 1px solid var(--vscode-input-border);
   border-radius: 4px;
-  padding: 8px;
-  font-family: var(--vscode-font-family);
+  overflow: hidden;
+  box-sizing: border-box;
+  width: 100%;
 }
 
-#sendButton, #selectFilesButton {
-  background-color: var(--vscode-button-background);
+/* Input box - updated from existing */
+#promptInput {
+  width: 100%;
+  min-height: 60px;
+  height: auto;
+  resize: none;
+  background-color: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border: none;
+  padding: 8px;
+  font-family: var(--vscode-font-family);
+  line-height: 1.5;
+  box-sizing: border-box;
+  overflow-y: hidden;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+}
+
+/* Controls panel - new section */
+.controls-panel {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 8px;
+  background-color: var(--vscode-input-background);
+  border-top: 1px solid var(--vscode-input-border, rgba(128, 128, 128, 0.35));
+  min-height: 32px;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.file-select-button {
+  background: none;
   color: var(--vscode-button-foreground);
   border: none;
   border-radius: 4px;
-  padding: 0 12px;
+  padding: 4px;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  min-height: 28px;
 }
 
-#sendButton:hover, #selectFilesButton:hover {
+.file-select-button:hover {
+  background-color: var(--vscode-button-hoverBackground);
+}
+
+.model-info {
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.9em;
+  text-align: center;
+}
+
+/* Send button */
+#selectFilesButton {
+  background: none;
+  color: var(--vscode-button-foreground);
+  border: none;
+  border-radius: 4px;
+  padding: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#selectFilesButton:hover {
   background-color: var(--vscode-button-hoverBackground);
 }
 
@@ -298,17 +351,17 @@ code {
 
 /* Loading indicator button */
 .send-button {
-  background-color: var(--vscode-button-background);
+  background: none;
   color: var(--vscode-button-foreground);
   border: none;
   border-radius: 4px;
-  padding: 0 12px;
+  padding: 4px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 100%;
-  min-width: 32px;
+  min-width: 28px;
+  min-height: 28px;
 }
 
 .send-button:hover {

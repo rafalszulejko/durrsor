@@ -64,15 +64,16 @@ interface Log {
   // DOM elements
   const chatContainer = document.getElementById('chatContainer');
   const promptInput = document.getElementById('promptInput') as HTMLTextAreaElement;
-  const sendButtonContainer = document.getElementById('sendButton');
+  const sendButtonContainer = document.getElementById('sendButtonContainer');
   const selectFilesButton = document.getElementById('selectFilesButton');
   const selectedFilesContainer = document.getElementById('selectedFiles');
+  const smallModelNameElement = document.getElementById('smallModelName');
+  const bigModelNameElement = document.getElementById('bigModelName');
   
   // Initialize loading indicator
   const loadingIndicator = new LoadingIndicator();
   if (sendButtonContainer) {
-    // Replace the old send button with our new loading indicator button
-    sendButtonContainer.replaceWith(loadingIndicator.getElement());
+    sendButtonContainer.appendChild(loadingIndicator.getElement());
   }
   
   // State
@@ -81,6 +82,31 @@ interface Log {
   
   // Map to track streaming message elements by ID
   const streamingMessages = new Map<string, HTMLElement>();
+  
+  // Auto-resize textarea function
+  function autoResizeTextarea() {
+    if (!promptInput) return;
+    
+    // Reset height to auto to get correct scrollHeight
+    promptInput.style.height = 'auto';
+    // Set new height based on scrollHeight (+ padding to avoid scrollbar flicker)
+    promptInput.style.height = `${promptInput.scrollHeight}px`;
+  }
+  
+  // Set up auto-resize for textarea
+  promptInput?.addEventListener('input', autoResizeTextarea);
+  
+  // Also resize on window resize
+  window.addEventListener('resize', autoResizeTextarea);
+  
+  // Initial resize when page loads
+  if (promptInput) {
+    // Slightly delay the initial resize to ensure proper rendering
+    setTimeout(autoResizeTextarea, 100);
+  }
+  
+  // Request model information from extension
+  vscode.postMessage({ command: 'getModelInfo' });
   
   // Event listeners
   loadingIndicator.onClick(sendPrompt);
@@ -124,6 +150,9 @@ interface Log {
       case 'hideLoading':
         hideLoadingIndicator();
         break;
+      case 'modelInfo':
+        updateModelInfo(message.smallModel, message.bigModel);
+        break;
     }
   });
   
@@ -145,8 +174,9 @@ interface Log {
       selectedFiles
     });
     
-    // Clear input
+    // Clear input and reset height
     promptInput.value = '';
+    promptInput.style.height = 'auto';
   }
   
   function handleMessage(message: BaseMessage) {
@@ -248,6 +278,15 @@ interface Log {
         fileChip.appendChild(removeButton);
         selectedFilesContainer.appendChild(fileChip);
       });
+    }
+  }
+  
+  function updateModelInfo(smallModel: string, bigModel: string) {
+    if (smallModelNameElement) {
+      smallModelNameElement.textContent = smallModel;
+    }
+    if (bigModelNameElement) {
+      bigModelNameElement.textContent = bigModel;
     }
   }
   
