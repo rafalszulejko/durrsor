@@ -14,6 +14,7 @@ import {
   AIMessageComponent,
   LogMessageComponent
 } from './components';
+import { LoadingIndicator } from './components/LoadingIndicator';
 
 // Import utils
 import { getComponentForMessage, reconstructMessage } from './utils';
@@ -63,10 +64,16 @@ interface Log {
   // DOM elements
   const chatContainer = document.getElementById('chatContainer');
   const promptInput = document.getElementById('promptInput') as HTMLTextAreaElement;
-  const sendButton = document.getElementById('sendButton');
+  const sendButtonContainer = document.getElementById('sendButton');
   const selectFilesButton = document.getElementById('selectFilesButton');
   const selectedFilesContainer = document.getElementById('selectedFiles');
-  const loadingIndicator = document.getElementById('loadingIndicator');
+  
+  // Initialize loading indicator
+  const loadingIndicator = new LoadingIndicator();
+  if (sendButtonContainer) {
+    // Replace the old send button with our new loading indicator button
+    sendButtonContainer.replaceWith(loadingIndicator.getElement());
+  }
   
   // State
   let selectedFiles: string[] = [];
@@ -76,7 +83,7 @@ interface Log {
   const streamingMessages = new Map<string, HTMLElement>();
   
   // Event listeners
-  sendButton?.addEventListener('click', sendPrompt);
+  loadingIndicator.onClick(sendPrompt);
   promptInput?.addEventListener('keydown', (e: KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -246,16 +253,12 @@ interface Log {
   
   function showLoadingIndicator() {
     isLoading = true;
-    
-    // Show the dedicated loading indicator
-    loadingIndicator?.classList.add('visible');
+    loadingIndicator.setLoading(true);
   }
   
   function hideLoadingIndicator() {
     isLoading = false;
-    
-    // Hide the dedicated loading indicator
-    loadingIndicator?.classList.remove('visible');
+    loadingIndicator.setLoading(false);
   }
   
   function scrollToBottom() {

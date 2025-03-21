@@ -48,7 +48,9 @@
         "durrsor.bigModel": {
           "type": "string",
           "default": "gpt-4o",
-          "enum": ["gpt-4o"],
+          "enum": [
+            "gpt-4o"
+          ],
           "enumDescriptions": [
             "GPT-4o - OpenAI's most capable model"
           ],
@@ -57,7 +59,9 @@
         "durrsor.smallModel": {
           "type": "string",
           "default": "gpt-4o-mini",
-          "enum": ["gpt-4o-mini"],
+          "enum": [
+            "gpt-4o-mini"
+          ],
           "enumDescriptions": [
             "GPT-4o-mini - Smaller, faster OpenAI model"
           ],
@@ -110,6 +114,7 @@
     "@langchain/core": "^0.3.42",
     "@langchain/langgraph": "^0.2.54",
     "@langchain/openai": "^0.4.4",
+    "@vscode/codicons": "^0.0.36",
     "diff": "^7.0.0",
     "highlight.js": "^11.11.1",
     "markdown-it": "^14.1.0",

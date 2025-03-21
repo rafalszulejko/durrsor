@@ -66,7 +66,12 @@ class DurrsorViewProvider implements vscode.WebviewViewProvider {
 			vscode.Uri.joinPath(this._extensionUri, 'dist', 'webview', 'styles', 'main.css')
 		);
 		
-		return getLayout(webview, getNonce(), stylePath, scriptPath);
+		// Get path to codicons
+		const codiconsPath = webview.asWebviewUri(
+			vscode.Uri.joinPath(this._extensionUri, 'node_modules', '@vscode/codicons', 'dist', 'codicon.css')
+		);
+		
+		return getLayout(webview, getNonce(), stylePath, scriptPath, codiconsPath);
 	}
 
 	private async _handleMessage(message: any) {

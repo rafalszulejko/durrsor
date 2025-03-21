@@ -296,36 +296,52 @@ code {
   display: none;
 }
 
-/* Loading indicator */
-.loading-indicator {
-  display: none;
+/* Loading indicator button */
+.send-button {
+  background-color: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  border: none;
+  border-radius: 4px;
+  padding: 0 12px;
+  cursor: pointer;
+  display: flex;
   align-items: center;
   justify-content: center;
-  padding: 8px;
-  border-top: 1px solid var(--vscode-panel-border);
-  border-bottom: 1px solid var(--vscode-panel-border);
-  background-color: var(--vscode-editor-background);
+  height: 100%;
+  min-width: 32px;
 }
 
-.loading-indicator.visible {
-  display: flex;
+.send-button:hover {
+  background-color: var(--vscode-button-hoverBackground);
 }
 
-.loading-spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid var(--vscode-activityBarBadge-background);
-  border-radius: 50%;
-  border-top-color: transparent;
-  animation: spin 1s linear infinite;
-  margin-right: 8px;
+.send-button:disabled {
+  opacity: 0.7;
+  cursor: wait;
 }
 
-.loading-text {
-  color: var(--vscode-descriptionForeground);
-  font-style: italic;
+/* Codicon specific styles */
+.codicon {
+  font-family: 'codicon';
+  font-display: block;
+  font-size: 16px;
+  line-height: 1;
 }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
+.codicon-modifier-spin {
+  animation: codicon-spin 1.5s steps(30) infinite;
+}
+
+@keyframes codicon-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Remove old loading indicator styles */
+.loading-indicator {
+  display: none;
 } 
