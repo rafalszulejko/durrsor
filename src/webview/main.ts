@@ -12,7 +12,8 @@ import MarkdownIt from 'markdown-it';
 // Import components
 import {
   AIMessageComponent,
-  LogMessageComponent
+  LogMessageComponent,
+  FileChip
 } from './components';
 import { LoadingIndicator } from './components/LoadingIndicator';
 
@@ -263,20 +264,11 @@ interface Log {
       selectedFilesContainer.innerHTML = '';
     
       files.forEach(file => {
-        const fileChip = document.createElement('span');
-        fileChip.className = 'file-chip';
-        fileChip.textContent = file;
-        
-        const removeButton = document.createElement('button');
-        removeButton.className = 'remove-file';
-        removeButton.textContent = '×';
-        removeButton.addEventListener('click', () => {
-          selectedFiles = selectedFiles.filter(f => f !== file);
+        const fileChip = new FileChip(file, (fileToRemove) => {
+          selectedFiles = selectedFiles.filter(f => f !== fileToRemove);
           updateSelectedFiles(selectedFiles);
         });
-        
-        fileChip.appendChild(removeButton);
-        selectedFilesContainer.appendChild(fileChip);
+        selectedFilesContainer.appendChild(fileChip.render());
       });
     }
   }
