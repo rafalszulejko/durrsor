@@ -13,9 +13,11 @@ import MarkdownIt from 'markdown-it';
 import {
   AIMessageComponent,
   LogMessageComponent,
-  FileChip
+  FileChip,
+  GitCheckpointComponent
 } from './components';
 import { LoadingIndicator } from './components/LoadingIndicator';
+import { GitCheckpointMessage } from './messages/GitCheckpointMessage';
 
 // Import utils
 import { getComponentForMessage, reconstructMessage } from './utils';
@@ -144,6 +146,9 @@ interface Log {
         break;
       case 'selectedFiles':
         updateSelectedFiles([...selectedFiles, ...message.files]);
+        break;
+      case 'gitCheckpoint':
+        handleGitCheckpoint(message.commitHash);
         break;
       case 'showLoading':
         showLoadingIndicator();
@@ -296,5 +301,15 @@ interface Log {
     if (chatContainer) {
       chatContainer.scrollTop = chatContainer.scrollHeight;
     }
+  }
+  
+  function handleGitCheckpoint(commitHash: string) {
+    if (!chatContainer) return;
+    
+    // Create a git checkpoint message
+    const message = new GitCheckpointMessage({ content: commitHash });
+    const checkpointComponent = new GitCheckpointComponent(message);
+    chatContainer.appendChild(checkpointComponent.render());
+    scrollToBottom();
   }
 })(); 

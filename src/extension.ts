@@ -152,6 +152,14 @@ class DurrsorViewProvider implements vscode.WebviewViewProvider {
 			
 			// Save state for next invocation
 			this._previousState = result;
+
+			// If there's a commit hash in the result, send git checkpoint message
+			if (result.commit_hash) {
+				this._view?.webview.postMessage({
+					command: 'gitCheckpoint',
+					commitHash: result.commit_hash
+				});
+			}
 			
 			// Hide loading indicator
 			this._view?.webview.postMessage({ command: 'hideLoading' });

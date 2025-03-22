@@ -6,4 +6,5 @@ export { GenericToolComponent } from './GenericToolComponent';
 export { FileToolComponent } from './FileToolComponent';
 export { LogMessageComponent } from './LogMessageComponent';
 export { LoadingIndicator } from './LoadingIndicator';
-export { FileChip } from './FileChip'; 
+export { FileChip } from './FileChip';
+export * from './GitCheckpointComponent'; 
