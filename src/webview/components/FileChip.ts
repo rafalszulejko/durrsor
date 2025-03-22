@@ -2,10 +2,12 @@ export class FileChip {
     private element: HTMLSpanElement;
     private onRemove: (file: string) => void;
     private fullPath: string;
+    private removable: boolean;
 
-    constructor(fullPath: string, onRemove: (file: string) => void) {
+    constructor(fullPath: string, onRemove: (file: string) => void, removable: boolean = true) {
         this.fullPath = fullPath;
         this.onRemove = onRemove;
+        this.removable = removable;
         this.element = this.createChipElement();
     }
 
@@ -29,12 +31,14 @@ export class FileChip {
         fileName.textContent = this.getFileName();
         chip.appendChild(fileName);
 
-        // Add remove button
-        const removeButton = document.createElement('button');
-        removeButton.className = 'remove-file';
-        removeButton.textContent = '×';
-        removeButton.addEventListener('click', () => this.onRemove(this.fullPath));
-        chip.appendChild(removeButton);
+        // Add remove button only if removable
+        if (this.removable) {
+            const removeButton = document.createElement('button');
+            removeButton.className = 'remove-file';
+            removeButton.textContent = '×';
+            removeButton.addEventListener('click', () => this.onRemove(this.fullPath));
+            chip.appendChild(removeButton);
+        }
 
         return chip;
     }

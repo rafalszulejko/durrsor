@@ -1,5 +1,6 @@
 import { HumanMessage } from '@langchain/core/messages';
 import { MessageComponent } from './MessageComponent';
+import { FileChip } from './FileChip';
 
 export class HumanMessageComponent extends MessageComponent {
   private selectedFiles: string[];
@@ -25,10 +26,8 @@ export class HumanMessageComponent extends MessageComponent {
       filesElement.className = 'files';
       
       this.selectedFiles.forEach(file => {
-        const fileChip = document.createElement('span');
-        fileChip.className = 'file-chip';
-        fileChip.textContent = file;
-        filesElement.appendChild(fileChip);
+        const fileChip = new FileChip(file, () => {}, false);
+        filesElement.appendChild(fileChip.render());
       });
       
       element.appendChild(filesElement);
