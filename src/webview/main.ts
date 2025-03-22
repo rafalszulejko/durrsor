@@ -143,7 +143,7 @@ interface Log {
         handleLog(message.level, message.message, message.isNewType);
         break;
       case 'selectedFiles':
-        updateSelectedFiles(message.files);
+        updateSelectedFiles([...selectedFiles, ...message.files]);
         break;
       case 'showLoading':
         showLoadingIndicator();
@@ -257,13 +257,13 @@ interface Log {
   }
   
   function updateSelectedFiles(files: string[]) {
-    selectedFiles = files;
+    selectedFiles = [...new Set(files)];
     
     // Update UI
     if (selectedFilesContainer) {
       selectedFilesContainer.innerHTML = '';
     
-      files.forEach(file => {
+      selectedFiles.forEach(file => {
         const fileChip = new FileChip(file, (fileToRemove) => {
           selectedFiles = selectedFiles.filter(f => f !== fileToRemove);
           updateSelectedFiles(selectedFiles);
