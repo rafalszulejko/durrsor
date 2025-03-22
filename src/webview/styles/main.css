@@ -36,57 +36,129 @@ body {
 }
 
 .file-chip {
-  background-color: var(--vscode-badge-background);
-  color: var(--vscode-badge-foreground);
-  border-radius: 4px;
-  padding: 2px 8px;
-  font-size: 12px;
   display: inline-flex;
   align-items: center;
+  gap: 6px;
+  padding: 4px;
+  margin: 4px;
+  border-radius: 4px;
+  background-color: var(--vscode-input-background);
+  border: 1px solid var(--vscode-input-border);
+  font-size: 12px;
 }
 
-.remove-file {
+.file-chip .codicon {
+  font-size: 14px;
+  color: var(--vscode-textLink-foreground);
+  margin: 0 2px;
+}
+
+.file-chip .file-name {
+  color: var(--vscode-input-foreground);
+  margin-right: 2px;
+}
+
+.file-chip .remove-file {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: none;
   border: none;
-  color: var(--vscode-badge-foreground);
-  margin-left: 4px;
-  cursor: pointer;
-  font-size: 14px;
+  color: var(--vscode-input-foreground);
   opacity: 0.7;
+  cursor: pointer;
+  padding: 0;
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+  margin-left: 2px;
 }
 
-.remove-file:hover {
+.file-chip .remove-file:hover {
   opacity: 1;
 }
 
-/* Input box */
-.input-box {
+/* Prompt container - new section to replace input-box */
+.prompt-container {
   display: flex;
-  gap: 8px;
-}
-
-#promptInput {
-  flex: 1;
-  min-height: 60px;
-  resize: vertical;
+  flex-direction: column;
   background-color: var(--vscode-input-background);
-  color: var(--vscode-input-foreground);
   border: 1px solid var(--vscode-input-border);
   border-radius: 4px;
-  padding: 8px;
-  font-family: var(--vscode-font-family);
+  overflow: hidden;
+  box-sizing: border-box;
+  width: 100%;
 }
 
-#sendButton, #selectFilesButton {
-  background-color: var(--vscode-button-background);
+/* Input box - updated from existing */
+#promptInput {
+  width: 100%;
+  min-height: 60px;
+  height: auto;
+  resize: none;
+  background-color: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  border: none;
+  padding: 8px;
+  font-family: var(--vscode-font-family);
+  line-height: 1.5;
+  box-sizing: border-box;
+  overflow-y: hidden;
+  word-wrap: break-word;
+  white-space: pre-wrap;
+}
+
+/* Controls panel - new section */
+.controls-panel {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 8px;
+  background-color: var(--vscode-input-background);
+  border-top: 1px solid var(--vscode-input-border, rgba(128, 128, 128, 0.35));
+  min-height: 32px;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.file-select-button {
+  background: none;
   color: var(--vscode-button-foreground);
   border: none;
   border-radius: 4px;
-  padding: 0 12px;
+  padding: 4px;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  min-height: 28px;
 }
 
-#sendButton:hover, #selectFilesButton:hover {
+.file-select-button:hover {
+  background-color: var(--vscode-button-hoverBackground);
+}
+
+.model-info {
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.9em;
+  text-align: center;
+}
+
+/* Send button */
+#selectFilesButton {
+  background: none;
+  color: var(--vscode-button-foreground);
+  border: none;
+  border-radius: 4px;
+  padding: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#selectFilesButton:hover {
   background-color: var(--vscode-button-hoverBackground);
 }
 
@@ -296,36 +368,52 @@ code {
   display: none;
 }
 
-/* Loading indicator */
-.loading-indicator {
-  display: none;
+/* Loading indicator button */
+.send-button {
+  background: none;
+  color: var(--vscode-button-foreground);
+  border: none;
+  border-radius: 4px;
+  padding: 4px;
+  cursor: pointer;
+  display: flex;
   align-items: center;
   justify-content: center;
-  padding: 8px;
-  border-top: 1px solid var(--vscode-panel-border);
-  border-bottom: 1px solid var(--vscode-panel-border);
-  background-color: var(--vscode-editor-background);
+  min-width: 28px;
+  min-height: 28px;
 }
 
-.loading-indicator.visible {
-  display: flex;
+.send-button:hover {
+  background-color: var(--vscode-button-hoverBackground);
 }
 
-.loading-spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid var(--vscode-activityBarBadge-background);
-  border-radius: 50%;
-  border-top-color: transparent;
-  animation: spin 1s linear infinite;
-  margin-right: 8px;
+.send-button:disabled {
+  opacity: 0.7;
+  cursor: wait;
 }
 
-.loading-text {
-  color: var(--vscode-descriptionForeground);
-  font-style: italic;
+/* Codicon specific styles */
+.codicon {
+  font-family: 'codicon';
+  font-display: block;
+  font-size: 16px;
+  line-height: 1;
 }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
+.codicon-modifier-spin {
+  animation: codicon-spin 1.5s steps(30) infinite;
+}
+
+@keyframes codicon-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Remove old loading indicator styles */
+.loading-indicator {
+  display: none;
 } 

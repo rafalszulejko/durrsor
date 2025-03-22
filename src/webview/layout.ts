@@ -1,32 +1,35 @@
 import * as vscode from 'vscode';
 
-export function getLayout(webview: vscode.Webview, nonce: string, stylePath: vscode.Uri, scriptPath: vscode.Uri) {
+export function getLayout(webview: vscode.Webview, nonce: string, stylePath: vscode.Uri, scriptPath: vscode.Uri, codiconsUri: vscode.Uri) {
 	return `<!DOCTYPE html>
 		<html lang="en">
 		<head>
 			<meta charset="UTF-8">
 			<meta name="viewport" content="width=device-width, initial-scale=1.0">
-			<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
+			<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${webview.cspSource}; font-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
 			<title>Durrsor</title>
+			<link rel="stylesheet" href="${codiconsUri}">
 			<link rel="stylesheet" href="${stylePath}">
 		</head>
 		<body>
 			<div class="chat-container" id="chatContainer"></div>
 			
-			<div class="loading-indicator" id="loadingIndicator">
-				<div class="loading-spinner"></div>
-				<div class="loading-text">Thinking...</div>
-			</div>
-			
 			<div class="input-container">
 				<div class="file-selector" id="fileSelector">
-					<button id="selectFilesButton">Select Files</button>
 					<div id="selectedFiles" class="selected-files"></div>
 				</div>
 				
-				<div class="input-box">
+				<div class="prompt-container">
 					<textarea id="promptInput" placeholder="Ask a question..."></textarea>
-					<button id="sendButton">Send</button>
+					<div class="controls-panel">
+						<button id="selectFilesButton" class="file-select-button">
+							<span class="codicon codicon-add"></span>
+						</button>
+						<div id="modelInfo" class="model-info">
+							<span id="smallModelName"></span> | <span id="bigModelName"></span>
+						</div>
+						<div id="sendButtonContainer"></div>
+					</div>
 				</div>
 			</div>
 			

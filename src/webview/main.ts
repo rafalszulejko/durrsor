@@ -12,8 +12,10 @@ import MarkdownIt from 'markdown-it';
 // Import components
 import {
   AIMessageComponent,
-  LogMessageComponent
+  LogMessageComponent,
+  FileChip
 } from './components';
+import { LoadingIndicator } from './components/LoadingIndicator';
 
 // Import utils
 import { getComponentForMessage, reconstructMessage } from './utils';
@@ -63,10 +65,17 @@ interface Log {
   // DOM elements
   const chatContainer = document.getElementById('chatContainer');
   const promptInput = document.getElementById('promptInput') as HTMLTextAreaElement;
-  const sendButton = document.getElementById('sendButton');
+  const sendButtonContainer = document.getElementById('sendButtonContainer');
   const selectFilesButton = document.getElementById('selectFilesButton');
   const selectedFilesContainer = document.getElementById('selectedFiles');
-  const loadingIndicator = document.getElementById('loadingIndicator');
+  const smallModelNameElement = document.getElementById('smallModelName');
+  const bigModelNameElement = document.getElementById('bigModelName');
+  
+  // Initialize loading indicator
+  const loadingIndicator = new LoadingIndicator();
+  if (sendButtonContainer) {
+    sendButtonContainer.appendChild(loadingIndicator.getElement());
+  }
   
   // State
   let selectedFiles: string[] = [];
@@ -75,8 +84,33 @@ interface Log {
   // Map to track streaming message elements by ID
   const streamingMessages = new Map<string, HTMLElement>();
   
+  // Auto-resize textarea function
+  function autoResizeTextarea() {
+    if (!promptInput) return;
+    
+    // Reset height to auto to get correct scrollHeight
+    promptInput.style.height = 'auto';
+    // Set new height based on scrollHeight (+ padding to avoid scrollbar flicker)
+    promptInput.style.height = `${promptInput.scrollHeight}px`;
+  }
+  
+  // Set up auto-resize for textarea
+  promptInput?.addEventListener('input', autoResizeTextarea);
+  
+  // Also resize on window resize
+  window.addEventListener('resize', autoResizeTextarea);
+  
+  // Initial resize when page loads
+  if (promptInput) {
+    // Slightly delay the initial resize to ensure proper rendering
+    setTimeout(autoResizeTextarea, 100);
+  }
+  
+  // Request model information from extension
+  vscode.postMessage({ command: 'getModelInfo' });
+  
   // Event listeners
-  sendButton?.addEventListener('click', sendPrompt);
+  loadingIndicator.onClick(sendPrompt);
   promptInput?.addEventListener('keydown', (e: KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -109,13 +143,16 @@ interface Log {
         handleLog(message.level, message.message, message.isNewType);
         break;
       case 'selectedFiles':
-        updateSelectedFiles(message.files);
+        updateSelectedFiles([...selectedFiles, ...message.files]);
         break;
       case 'showLoading':
         showLoadingIndicator();
         break;
       case 'hideLoading':
         hideLoadingIndicator();
+        break;
+      case 'modelInfo':
+        updateModelInfo(message.smallModel, message.bigModel);
         break;
     }
   });
@@ -138,8 +175,9 @@ interface Log {
       selectedFiles
     });
     
-    // Clear input
+    // Clear input and reset height
     promptInput.value = '';
+    promptInput.style.height = 'auto';
   }
   
   function handleMessage(message: BaseMessage) {
@@ -219,43 +257,39 @@ interface Log {
   }
   
   function updateSelectedFiles(files: string[]) {
-    selectedFiles = files;
+    selectedFiles = [...new Set(files)];
     
     // Update UI
     if (selectedFilesContainer) {
       selectedFilesContainer.innerHTML = '';
     
-      files.forEach(file => {
-        const fileChip = document.createElement('span');
-        fileChip.className = 'file-chip';
-        fileChip.textContent = file;
-        
-        const removeButton = document.createElement('button');
-        removeButton.className = 'remove-file';
-        removeButton.textContent = '×';
-        removeButton.addEventListener('click', () => {
-          selectedFiles = selectedFiles.filter(f => f !== file);
+      selectedFiles.forEach(file => {
+        const fileChip = new FileChip(file, (fileToRemove) => {
+          selectedFiles = selectedFiles.filter(f => f !== fileToRemove);
           updateSelectedFiles(selectedFiles);
         });
-        
-        fileChip.appendChild(removeButton);
-        selectedFilesContainer.appendChild(fileChip);
+        selectedFilesContainer.appendChild(fileChip.render());
       });
+    }
+  }
+  
+  function updateModelInfo(smallModel: string, bigModel: string) {
+    if (smallModelNameElement) {
+      smallModelNameElement.textContent = smallModel;
+    }
+    if (bigModelNameElement) {
+      bigModelNameElement.textContent = bigModel;
     }
   }
   
   function showLoadingIndicator() {
     isLoading = true;
-    
-    // Show the dedicated loading indicator
-    loadingIndicator?.classList.add('visible');
+    loadingIndicator.setLoading(true);
   }
   
   function hideLoadingIndicator() {
     isLoading = false;
-    
-    // Hide the dedicated loading indicator
-    loadingIndicator?.classList.remove('visible');
+    loadingIndicator.setLoading(false);
   }
   
   function scrollToBottom() {

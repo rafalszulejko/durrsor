@@ -4,4 +4,6 @@ export { AIMessageComponent } from './AIMessageComponent';
 export { GenericMessageComponent } from './GenericMessageComponent';
 export { GenericToolComponent } from './GenericToolComponent';
 export { FileToolComponent } from './FileToolComponent';
-export { LogMessageComponent } from './LogMessageComponent'; 
+export { LogMessageComponent } from './LogMessageComponent';
+export { LoadingIndicator } from './LoadingIndicator';
+export { FileChip } from './FileChip'; 
