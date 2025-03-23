@@ -92,6 +92,9 @@ class DurrsorViewProvider implements vscode.WebviewViewProvider {
 			case 'getModelInfo':
 				this._sendModelInfo();
 				break;
+			case 'restoreGitCheckpoint':
+				this._logService.internal(`Restoring git checkpoint: ${message.commitHash}`);
+				break;
 		}
 	}
 

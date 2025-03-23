@@ -34,7 +34,14 @@ export class GitCheckpointComponent extends MessageComponent {
     restoreLabel.textContent = 'Restore';
     restoreLabel.style.cursor = 'pointer';
     restoreLabel.onclick = () => {
-      console.log('Restore clicked for commit:', this.message.content);
+      // Dispatch a custom event with the commit hash and element reference
+      const event = new CustomEvent('git-checkpoint-restore', {
+        detail: { 
+          commitHash: this.message.content,
+          element: element
+        }
+      });
+      document.dispatchEvent(event);
     };
     
     // Assemble the frame
