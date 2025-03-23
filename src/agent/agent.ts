@@ -163,4 +163,21 @@ export class CodeAgent {
       return null;
     }
   }
+
+  /**
+   * Get the latest checkpoint ID from the agent's state
+   * 
+   * @param threadId The thread ID
+   * @returns The latest checkpoint ID or null if not found
+   */
+  async getLastCheckpointId(threadId: string): Promise<string | null> {
+    try {
+      const config = { configurable: { thread_id: threadId } };
+      const state = await this.app.getState(config);
+      return state.config.configurable.checkpoint_id || null;
+    } catch (error) {
+      this.logService.internal(`Error getting last checkpoint ID: ${error}`);
+      return null;
+    }
+  }
 } 

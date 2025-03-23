@@ -15,6 +15,7 @@ export class AgentService {
   public readonly onMessageReceived = this._onMessageReceived.event;
   private _onMessageChunkReceived = new vscode.EventEmitter<{content: string, id: string}>();
   public readonly onMessageChunkReceived = this._onMessageChunkReceived.event;
+  private commitHashToCheckpointId: Map<string, string> = new Map();
   
   constructor() {
     this.logService = LogService.getInstance();
@@ -75,8 +76,9 @@ export class AgentService {
               }
             }
             else if (event.event === "on_chat_model_end") {
-              // LLM has finished generating
+              // LLM has finished generating, we might have non-streamed agent responses here
               this.logService.internal(`LLM finished: ${event.name}`);
+              this.logService.internal(`on_chat_model_end event data: ${JSON.stringify(event.data)}`);
             }
             else if (event.event === "on_tool_end") {
               // Tool has finished execution
@@ -140,14 +142,24 @@ export class AgentService {
         // Commit changes
         const commitHash = await this.commitChanges(result, diff);
         
+        // Get the latest checkpoint ID
+        const checkpointId = await this.agent.getLastCheckpointId(threadId);
+        if (checkpointId) {
+          this.commitHashToCheckpointId.set(commitHash, checkpointId);
+          this.logService.internal(`Mapped commit ${commitHash} to checkpoint ${checkpointId}`);
+          this.logService.internal(`Current map state: ${JSON.stringify(Object.fromEntries(this.commitHashToCheckpointId))}`);
+        }
+        
         // Add diff and commit hash to result
         result.diff = diff;
         result.commit_hash = commitHash;
-        
-        // Save logs to file after committing changes
-        await this.logService.saveLogs();
       }
       
+      this.logService.internal(`Result: ${JSON.stringify(result)}`);
+
+      // Save logs to file after committing changes
+      await this.logService.saveLogs();
+
       return result;
     } catch (error: unknown) {
       // Log the error
@@ -172,7 +184,7 @@ export class AgentService {
    * @returns The commit hash
    */
   private async commitChanges(state: GraphStateType, diff: string): Promise<string> {
-    this.logService.thinking("Generating commit message...");
+    this.logService.internal("Generating commit message...");
     
     // Get the model provider instance
     const modelProvider = ModelService.getInstance();
@@ -191,7 +203,7 @@ export class AgentService {
       new SystemMessage(`\`\`\`\n${diff}\n\`\`\``)
     ]);
     
-    this.logService.thinking(`Commit message: ${commitMsgResponse.content}`);
+    this.logService.internal(`Commit message: ${commitMsgResponse.content}`);
     
     // Convert MessageContent to string
     const commitMessage = typeof commitMsgResponse.content === 'string' 
