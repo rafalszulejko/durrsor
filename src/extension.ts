@@ -8,6 +8,7 @@ import { LogService } from './services/logService';
 import { ToolMessage } from '@langchain/core/messages';
 import { ModelService } from './services/modelService';
 import { getLayout } from './webview/layout';
+import { GitService } from './agent/utils/git';
 
 // WebView provider class for the sidebar panel
 class DurrsorViewProvider implements vscode.WebviewViewProvider {
@@ -17,6 +18,7 @@ class DurrsorViewProvider implements vscode.WebviewViewProvider {
 	private _fileService: FileService;
 	private _logService: LogService;
 	private _previousState?: GraphStateType;
+	private _updatedConfig?: any; // Store the updated config separately from state
 
 	constructor(private readonly _extensionUri: vscode.Uri) {
 		this._logService = LogService.getInstance();
@@ -93,7 +95,7 @@ class DurrsorViewProvider implements vscode.WebviewViewProvider {
 				this._sendModelInfo();
 				break;
 			case 'restoreGitCheckpoint':
-				this._logService.internal(`Restoring git checkpoint: ${message.commitHash}`);
+				await this._handleRestoreGitCheckpoint(message.commitHash);
 				break;
 		}
 	}
@@ -142,11 +144,15 @@ class DurrsorViewProvider implements vscode.WebviewViewProvider {
 				});
 			});
 			
+			// Get the thread ID from the previous state and use stored updated config
+			const threadId = this._previousState?.thread_id;
+			
 			// Invoke agent
 			const result = await this._agentService.processPrompt(
 				prompt,
 				selectedFiles,
-				this._previousState?.thread_id
+				threadId,
+				this._updatedConfig
 			);
 			
 			// Dispose of event handlers
@@ -155,6 +161,9 @@ class DurrsorViewProvider implements vscode.WebviewViewProvider {
 			
 			// Save state for next invocation
 			this._previousState = result;
+			
+			// Clear the updatedConfig since it's been used
+			this._updatedConfig = undefined;
 
 			// If there's a commit hash in the result, send git checkpoint message
 			if (result.commit_hash) {
@@ -198,6 +207,83 @@ class DurrsorViewProvider implements vscode.WebviewViewProvider {
 			smallModel: modelService.getSmallModelName(),
 			bigModel: modelService.getBigModelName()
 		});
+	}
+
+	private async _handleRestoreGitCheckpoint(commitHash: string) {
+		// Show loading indicator
+		this._view?.webview.postMessage({ command: 'showLoading' });
+		
+		try {
+			this._logService.internal(`Restoring git checkpoint to commit: ${commitHash}`);
+			
+			// Perform git hard reset to the specified commit using GitService
+			const gitResult = await vscode.window.withProgress(
+				{
+					location: vscode.ProgressLocation.Notification,
+					title: "Resetting to checkpoint...",
+					cancellable: false
+				},
+				async () => {
+					return await GitService.resetToCommit(commitHash);
+				}
+			);
+			
+			this._logService.internal(gitResult);
+			
+			// Check if git reset was successful
+			if (gitResult.startsWith('Error:')) {
+				throw new Error(gitResult);
+			}
+			
+			// Get current thread ID from previous state
+			const threadId = this._previousState?.thread_id;
+			if (!threadId) {
+				throw new Error("No active thread ID found");
+			}
+			
+			// Restore agent to the checkpoint associated with this commit
+			const updatedConfig = await this._agentService.restoreToCheckpoint(commitHash, threadId);
+			
+			if (!updatedConfig) {
+				throw new Error(`Failed to restore agent state for commit: ${commitHash}`);
+			}
+			
+			// Store the updated config for next prompt
+			this._updatedConfig = updatedConfig;
+			this._logService.internal(`Stored updated config for next operation: ${JSON.stringify(updatedConfig)}`);
+			
+			// Get the restored state and set as previous state for next prompt
+			const restoredState = await this._agentService.getState(threadId);
+			if (restoredState) {
+				this._previousState = restoredState;
+				this._logService.internal(`Successfully restored previous state from checkpoint`);
+			}
+			
+			// Notify the webview that restore is complete
+			this._view?.webview.postMessage({ 
+				command: 'checkpointRestored', 
+				commitHash: commitHash,
+				success: true 
+			});
+			
+			// Hide loading indicator
+			this._view?.webview.postMessage({ command: 'hideLoading' });
+			
+		} catch (error: any) {
+			console.error('Error restoring checkpoint:', error);
+			this._logService.error('extension', `Error restoring checkpoint: ${error.message || 'An unknown error occurred'}`);
+			
+			// Notify webview of failure
+			this._view?.webview.postMessage({ 
+				command: 'checkpointRestored', 
+				commitHash: commitHash,
+				success: false,
+				error: error.message 
+			});
+			
+			// Hide loading indicator
+			this._view?.webview.postMessage({ command: 'hideLoading' });
+		}
 	}
 }
 

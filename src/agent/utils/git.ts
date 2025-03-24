@@ -307,4 +307,50 @@ export class GitService {
       return `Error during squash merge: ${error.message}`;
     }
   }
+
+  /**
+   * Reset to a specific commit with a hard reset (discards all changes)
+   * 
+   * @param commitHash The commit hash to reset to
+   * @returns Success or error message from the git operation
+   */
+  public static async resetToCommit(commitHash: string): Promise<string> {
+    try {
+      console.log(`GitService: Starting resetToCommit with hash: "${commitHash}"`);
+      
+      const gitData = this.getGitRepo();
+      if (!gitData) {
+        console.log(`GitService: Git extension not available`);
+        return "Error: Git extension not available";
+      }
+      
+      console.log(`GitService: Got repository: ${gitData.repo.rootUri.fsPath}`);
+      
+      // Log repository state
+      console.log(`GitService: Repository state before reset:`, {
+        headSHA: gitData.repo.state.HEAD?.commit || 'unknown',
+        branch: gitData.repo.state.HEAD?.name || 'unknown',
+        workingTreeChanges: (gitData.repo.state.workingTreeChanges || []).length
+      });
+      
+      // Perform a hard reset by checking out the commit
+      // Note: VSCode Git API doesn't have a direct reset method, but checkout with hard option is equivalent
+      await gitData.repo.checkout(commitHash, { hard: true });
+      
+      console.log(`GitService: Successfully reset to commit: ${commitHash}`);
+      
+      // Log repository state after reset
+      console.log(`GitService: Repository state after reset:`, {
+        headSHA: gitData.repo.state.HEAD?.commit || 'unknown',
+        branch: gitData.repo.state.HEAD?.name || 'unknown',
+        workingTreeChanges: (gitData.repo.state.workingTreeChanges || []).length
+      });
+      
+      return `Reset to commit ${commitHash} successful`;
+    } catch (error: any) {
+      console.error('GitService: Error resetting to commit:', error);
+      console.error(`GitService: Error stack: ${error.stack}`);
+      return `Error resetting to commit: ${error.message}`;
+    }
+  }
 } 

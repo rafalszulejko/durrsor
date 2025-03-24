@@ -28,12 +28,14 @@ export class AgentService {
    * @param prompt User's prompt
    * @param selectedFiles Array of selected file paths
    * @param threadId Optional thread ID for continuing a conversation
+   * @param externalConfig Optional external configuration from a restored checkpoint
    * @returns Agent response
    */
   async processPrompt(
     prompt: string,
     selectedFiles: string[] = [],
-    threadId?: string
+    threadId?: string,
+    externalConfig?: any
   ): Promise<GraphStateType> {
     this.logService.internal(`Processing prompt: ${prompt}`);
     this.logService.internal(`Selected files: ${selectedFiles}`);
@@ -57,7 +59,7 @@ export class AgentService {
     try {
       // Stream events from the agent execution
       try {
-        for await (const event of this.agent.streamEvents(prompt, selectedFiles, threadId)) {
+        for await (const event of this.agent.streamEvents(prompt, selectedFiles, threadId, externalConfig)) {
           try {
             // Handle different event types
             if (event.event === "on_chat_model_start") {
@@ -124,7 +126,7 @@ export class AgentService {
         this.logService.internal(`Error streaming events: ${streamError}`);
         
         // If streaming fails, fall back to regular invoke
-        await this.agent.invoke(prompt, selectedFiles, threadId);
+        await this.agent.invoke(prompt, selectedFiles, threadId, externalConfig);
       }
       
       // Get the final state
@@ -227,5 +229,52 @@ export class AgentService {
     const currentBranch = await GitService.getCurrentBranch();
     const parentBranch = currentBranch.replace(`durrsor-${threadId}`, '');
     return await GitService.squashAndMergeToBranch(parentBranch, commitMessage);
+  }
+
+  /**
+   * Restore the agent to a checkpoint associated with a specific commit hash
+   * 
+   * @param commitHash The git commit hash to restore to
+   * @param threadId The thread ID for the conversation
+   * @returns The updated configuration for subsequent agent operations, or null if restore failed
+   */
+  async restoreToCheckpoint(commitHash: string, threadId: string): Promise<any | null> {
+    try {
+      this.logService.internal(`Restoring agent to commit: ${commitHash}`);
+      
+      // Find the checkpoint ID associated with this commit hash
+      const checkpointId = this.commitHashToCheckpointId.get(commitHash);
+      
+      if (!checkpointId) {
+        this.logService.internal(`No checkpoint found for commit hash: ${commitHash}`);
+        return null;
+      }
+      
+      this.logService.internal(`Found checkpoint ID: ${checkpointId} for commit: ${commitHash}`);
+      
+      // Reset the agent to the checkpoint ID
+      const updatedConfig = await this.agent.resetAgentToCheckpointId(threadId, checkpointId);
+      
+      if (!updatedConfig) {
+        this.logService.internal(`Failed to reset agent to checkpoint: ${checkpointId}`);
+        return null;
+      }
+      
+      this.logService.internal(`Successfully restored agent to checkpoint for commit: ${commitHash}`);
+      return updatedConfig;
+    } catch (error) {
+      this.logService.internal(`Error restoring to checkpoint for commit ${commitHash}: ${error}`);
+      return null;
+    }
+  }
+  
+  /**
+   * Get the current state for a thread
+   * 
+   * @param threadId The thread ID
+   * @returns The current state for the thread
+   */
+  async getState(threadId: string): Promise<GraphStateType | null> {
+    return await this.agent.getState(threadId);
   }
 } 

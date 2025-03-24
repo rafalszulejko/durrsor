@@ -81,18 +81,20 @@ export class CodeAgent {
    * @param content The user's message content
    * @param selectedFiles List of files to include in the context
    * @param threadId Thread ID for the conversation
+   * @param externalConfig Optional external config from a restored checkpoint
    * @returns The result of the graph execution
    */
   async invoke(
     content: string,
     selectedFiles: string[] = [],
-    threadId: string
+    threadId: string,
+    externalConfig?: any
   ): Promise<GraphStateType> {
     // Create a human message from the content
     const message = new HumanMessage(content);
 
-    // Set up the configuration with thread_id
-    const config = { configurable: { thread_id: threadId } };
+    // Set up the configuration with thread_id or use the provided external config
+    const config = externalConfig || { configurable: { thread_id: threadId } };
 
     // Initialize the input state
     const inputState: Partial<GraphStateType> = {
@@ -104,6 +106,9 @@ export class CodeAgent {
     this.logService.internal(`Invoking agent with message: ${content}`);
     this.logService.internal(`Selected files: ${selectedFiles}`);
     this.logService.internal(`Thread ID: ${threadId}`);
+    if (externalConfig) {
+      this.logService.internal(`Using external config: ${JSON.stringify(externalConfig)}`);
+    }
 
     // Invoke the graph with the input state and configuration
     return await this.app.invoke(inputState, config);
@@ -115,22 +120,33 @@ export class CodeAgent {
    * @param content The user's message content
    * @param selectedFiles List of files to include in the context
    * @param threadId Thread ID for the conversation
+   * @param externalConfig Optional external config from a restored checkpoint
    * @returns An async iterable of events from the graph execution
    */
   async *streamEvents(
     content: string,
     selectedFiles: string[] = [],
-    threadId: string
+    threadId: string,
+    externalConfig?: any
   ): AsyncIterable<any> {
     // Create a human message from the content
     const message = new HumanMessage(content);
 
-    // Set up the configuration with thread_id and stream mode
-    const config = { 
+    // Set up the configuration with thread_id and stream mode or use the provided external config
+    let config = externalConfig || { 
       configurable: { thread_id: threadId },
       streamMode: "messages", // Stream LLM tokens and other events
       version: "v2" // Specify the schema version
     };
+    
+    // If we have an external config, make sure we add the streaming properties
+    if (externalConfig) {
+      config = {
+        ...externalConfig,
+        streamMode: "messages",
+        version: "v2"
+      };
+    }
 
     // Initialize the input state
     const inputState: Partial<GraphStateType> = {
@@ -142,6 +158,9 @@ export class CodeAgent {
     this.logService.internal(`Streaming agent with message: ${content}`);
     this.logService.internal(`Selected files: ${selectedFiles}`);
     this.logService.internal(`Thread ID: ${threadId}`);
+    if (externalConfig) {
+      this.logService.internal(`Using external config: ${JSON.stringify(externalConfig)}`);
+    }
 
     // Stream events from the graph execution
     yield* this.app.streamEvents(inputState, config);
@@ -177,6 +196,47 @@ export class CodeAgent {
       return state.config.configurable.checkpoint_id || null;
     } catch (error) {
       this.logService.internal(`Error getting last checkpoint ID: ${error}`);
+      return null;
+    }
+  }
+
+  /**
+   * Reset the agent to a specific checkpoint ID
+   * 
+   * @param threadId The thread ID for the conversation
+   * @param checkpointId The checkpoint ID to restore to
+   * @returns The updated graph configuration or null if reset failed
+   */
+  async resetAgentToCheckpointId(threadId: string, checkpointId: string): Promise<any | null> {
+    try {
+      this.logService.internal(`Resetting agent to checkpoint: ${checkpointId} for thread: ${threadId}`);
+      
+      // Create config with both thread ID and checkpoint ID
+      const configWithCheckpoint = { 
+        configurable: { 
+          thread_id: threadId, 
+          checkpoint_id: checkpointId 
+        } 
+      };
+      
+      // Fetch the state for this specific checkpoint
+      const stateWithCheckpoint = await this.app.getState(configWithCheckpoint);
+      
+      if (!stateWithCheckpoint) {
+        this.logService.internal(`Failed to find state for checkpoint: ${checkpointId}`);
+        return null;
+      }
+      
+      this.logService.internal(`Found state for checkpoint: ${checkpointId}`);
+      
+      // Update the app's state with the restored state
+      // This returns the config that should be used for subsequent operations
+      const updatedConfig = await this.app.updateState(configWithCheckpoint, { state: stateWithCheckpoint.values });
+      
+      this.logService.internal(`Successfully restored agent state to checkpoint: ${checkpointId}`);
+      return updatedConfig;
+    } catch (error) {
+      this.logService.internal(`Error resetting agent to checkpoint ${checkpointId}: ${error}`);
       return null;
     }
   }
