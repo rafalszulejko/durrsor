@@ -10,6 +10,32 @@ import { ModelService } from './services/modelService';
 import { getLayout } from './webview/layout';
 import { GitService } from './agent/utils/git';
 
+// Function to set LangSmith environment variables from configuration
+function updateLangSmithEnvFromConfig() {
+	const config = vscode.workspace.getConfiguration('durrsor');
+	
+	// Set LangSmith tracing flag - default to true
+	const tracingEnabled = config.get<boolean>('langsmith.tracing');
+	process.env.LANGSMITH_TRACING = tracingEnabled !== false ? "true" : "false";
+	
+	// Set LangSmith endpoint - use default if not specified
+	const endpoint = config.get<string>('langsmith.endpoint');
+	if (endpoint) {
+		process.env.LANGSMITH_ENDPOINT = endpoint;
+	} else {
+		process.env.LANGSMITH_ENDPOINT = "https://api.smith.langchain.com";
+	}
+
+	// Set LangSmith API key - from configuration
+	const apiKey = config.get<string>('langsmith.apiKey');
+	if (apiKey) {
+		process.env.LANGSMITH_API_KEY = apiKey;
+	}
+	
+	// The project name remains constant
+	process.env.LANGSMITH_PROJECT = "durrsor";
+}
+
 // WebView provider class for the sidebar panel
 class DurrsorViewProvider implements vscode.WebviewViewProvider {
 	public static readonly viewType = 'durrsor.sidePanel';
@@ -291,6 +317,9 @@ class DurrsorViewProvider implements vscode.WebviewViewProvider {
 // Your extension is activated the very first time the command is executed
 export function activate(context: vscode.ExtensionContext) {
 	console.log('Durrsor extension is now active!');
+	
+	// Set LangSmith environment variables from configuration
+	updateLangSmithEnvFromConfig();
 
 	// Register the WebView provider for the side panel
 	const durrsorViewProvider = new DurrsorViewProvider(context.extensionUri);
@@ -310,6 +339,10 @@ export function activate(context: vscode.ExtensionContext) {
 				ModelService.getInstance().refreshConfiguration();
 				// Refresh the log service configuration
 				LogService.getInstance().refreshConfiguration();
+				// Update LangSmith environment variables if the configuration changed
+				if (event.affectsConfiguration('durrsor.langsmith')) {
+					updateLangSmithEnvFromConfig();
+				}
 				console.log('Durrsor configuration refreshed');
 			}
 		})
