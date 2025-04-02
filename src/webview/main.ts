@@ -72,6 +72,8 @@ interface Log {
   const selectedFilesContainer = document.getElementById('selectedFiles');
   const smallModelNameElement = document.getElementById('smallModelName');
   const bigModelNameElement = document.getElementById('bigModelName');
+  const chatTitleElement = document.getElementById('chatTitle');
+  const settingsButton = document.getElementById('settingsButton');
   
   // Initialize loading indicator
   const loadingIndicator = new LoadingIndicator();
@@ -151,6 +153,11 @@ interface Log {
     vscode.postMessage({ command: 'selectFiles' });
   });
   
+  // Settings button event listener
+  settingsButton?.addEventListener('click', () => {
+    vscode.postMessage({ command: 'openSettings' });
+  });
+  
   // Handle messages from extension
   window.addEventListener('message', (event) => {
     const message = event.data;
@@ -185,6 +192,11 @@ interface Log {
         break;
       case 'modelInfo':
         updateModelInfo(message.smallModel, message.bigModel);
+        break;
+      case 'threadUpdated':
+        if (message.threadId) {
+          updateChatTitle(message.threadId);
+        }
         break;
     }
   });
@@ -312,6 +324,17 @@ interface Log {
     if (bigModelNameElement) {
       bigModelNameElement.textContent = bigModel;
     }
+  }
+  
+  function updateChatTitle(threadId: string) {
+    if (!chatTitleElement) return;
+    
+    // Extract the first part of the thread ID before the first dash
+    // If no dash, use the whole ID
+    const chatId = threadId.split('-')[0];
+    
+    // Update the chat title
+    chatTitleElement.textContent = `Chat ${chatId}`;
   }
   
   function showLoadingIndicator() {

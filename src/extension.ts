@@ -123,6 +123,9 @@ class DurrsorViewProvider implements vscode.WebviewViewProvider {
 			case 'restoreGitCheckpoint':
 				await this._handleRestoreGitCheckpoint(message.commitHash);
 				break;
+			case 'openSettings':
+				await vscode.commands.executeCommand('workbench.action.openSettings', 'durrsor');
+				break;
 		}
 	}
 
@@ -196,6 +199,15 @@ class DurrsorViewProvider implements vscode.WebviewViewProvider {
 				this._view?.webview.postMessage({
 					command: 'gitCheckpoint',
 					commitHash: result.commit_hash
+				});
+			}
+			
+			// Send a thread updated message to update the chat title only if the thread ID has changed
+			// or if this is a new thread (previousThreadId is undefined)
+			if (result.thread_id && result.thread_id !== threadId) {
+				this._view?.webview.postMessage({
+					command: 'threadUpdated',
+					threadId: result.thread_id
 				});
 			}
 			
