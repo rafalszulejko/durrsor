@@ -13,9 +13,11 @@ import MarkdownIt from 'markdown-it';
 import {
   AIMessageComponent,
   LogMessageComponent,
-  FileChip
+  FileChip,
+  GitCheckpointComponent
 } from './components';
 import { LoadingIndicator } from './components/LoadingIndicator';
+import { GitCheckpointMessage } from './messages/GitCheckpointMessage';
 
 // Import utils
 import { getComponentForMessage, reconstructMessage } from './utils';
@@ -76,6 +78,33 @@ interface Log {
   if (sendButtonContainer) {
     sendButtonContainer.appendChild(loadingIndicator.getElement());
   }
+  
+  // Define the type for our custom event
+  interface GitCheckpointRestoreEvent extends CustomEvent {
+    detail: {
+      commitHash: string;
+      element: HTMLElement;
+    };
+  }
+  
+  // Listen for git checkpoint restore events
+  document.addEventListener('git-checkpoint-restore', ((event: GitCheckpointRestoreEvent) => {
+    const { commitHash, element } = event.detail;
+    
+    // Remove all messages that come after this checkpoint
+    let nextMessage = element.nextElementSibling;
+    while (nextMessage) {
+      const messageToRemove = nextMessage;
+      nextMessage = nextMessage.nextElementSibling;
+      chatContainer?.removeChild(messageToRemove);
+    }
+    
+    // Send message to extension to handle the actual git restore
+    vscode.postMessage({ 
+      command: 'restoreGitCheckpoint',
+      commitHash 
+    });
+  }) as EventListener);
   
   // State
   let selectedFiles: string[] = [];
@@ -144,6 +173,9 @@ interface Log {
         break;
       case 'selectedFiles':
         updateSelectedFiles([...selectedFiles, ...message.files]);
+        break;
+      case 'gitCheckpoint':
+        handleGitCheckpoint(message.commitHash);
         break;
       case 'showLoading':
         showLoadingIndicator();
@@ -296,5 +328,15 @@ interface Log {
     if (chatContainer) {
       chatContainer.scrollTop = chatContainer.scrollHeight;
     }
+  }
+  
+  function handleGitCheckpoint(commitHash: string) {
+    if (!chatContainer) return;
+    
+    // Create a git checkpoint message
+    const message = new GitCheckpointMessage({ content: commitHash });
+    const checkpointComponent = new GitCheckpointComponent(message);
+    chatContainer.appendChild(checkpointComponent.render());
+    scrollToBottom();
   }
 })(); 

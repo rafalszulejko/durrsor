@@ -15,6 +15,7 @@ export class AgentService {
   public readonly onMessageReceived = this._onMessageReceived.event;
   private _onMessageChunkReceived = new vscode.EventEmitter<{content: string, id: string}>();
   public readonly onMessageChunkReceived = this._onMessageChunkReceived.event;
+  private commitHashToCheckpointId: Map<string, string> = new Map();
   
   constructor() {
     this.logService = LogService.getInstance();
@@ -27,12 +28,14 @@ export class AgentService {
    * @param prompt User's prompt
    * @param selectedFiles Array of selected file paths
    * @param threadId Optional thread ID for continuing a conversation
+   * @param externalConfig Optional external configuration from a restored checkpoint
    * @returns Agent response
    */
   async processPrompt(
     prompt: string,
     selectedFiles: string[] = [],
-    threadId?: string
+    threadId?: string,
+    externalConfig?: any
   ): Promise<GraphStateType> {
     this.logService.internal(`Processing prompt: ${prompt}`);
     this.logService.internal(`Selected files: ${selectedFiles}`);
@@ -56,7 +59,7 @@ export class AgentService {
     try {
       // Stream events from the agent execution
       try {
-        for await (const event of this.agent.streamEvents(prompt, selectedFiles, threadId)) {
+        for await (const event of this.agent.streamEvents(prompt, selectedFiles, threadId, externalConfig)) {
           try {
             // Handle different event types
             if (event.event === "on_chat_model_start") {
@@ -75,8 +78,9 @@ export class AgentService {
               }
             }
             else if (event.event === "on_chat_model_end") {
-              // LLM has finished generating
+              // LLM has finished generating, we might have non-streamed agent responses here
               this.logService.internal(`LLM finished: ${event.name}`);
+              this.logService.internal(`on_chat_model_end event data: ${JSON.stringify(event.data)}`);
             }
             else if (event.event === "on_tool_end") {
               // Tool has finished execution
@@ -122,7 +126,7 @@ export class AgentService {
         this.logService.internal(`Error streaming events: ${streamError}`);
         
         // If streaming fails, fall back to regular invoke
-        await this.agent.invoke(prompt, selectedFiles, threadId);
+        await this.agent.invoke(prompt, selectedFiles, threadId, externalConfig);
       }
       
       // Get the final state
@@ -140,14 +144,24 @@ export class AgentService {
         // Commit changes
         const commitHash = await this.commitChanges(result, diff);
         
+        // Get the latest checkpoint ID
+        const checkpointId = await this.agent.getLastCheckpointId(threadId);
+        if (checkpointId) {
+          this.commitHashToCheckpointId.set(commitHash, checkpointId);
+          this.logService.internal(`Mapped commit ${commitHash} to checkpoint ${checkpointId}`);
+          this.logService.internal(`Current map state: ${JSON.stringify(Object.fromEntries(this.commitHashToCheckpointId))}`);
+        }
+        
         // Add diff and commit hash to result
         result.diff = diff;
         result.commit_hash = commitHash;
-        
-        // Save logs to file after committing changes
-        await this.logService.saveLogs();
       }
       
+      this.logService.internal(`Result: ${JSON.stringify(result)}`);
+
+      // Save logs to file after committing changes
+      await this.logService.saveLogs();
+
       return result;
     } catch (error: unknown) {
       // Log the error
@@ -172,7 +186,7 @@ export class AgentService {
    * @returns The commit hash
    */
   private async commitChanges(state: GraphStateType, diff: string): Promise<string> {
-    this.logService.thinking("Generating commit message...");
+    this.logService.internal("Generating commit message...");
     
     // Get the model provider instance
     const modelProvider = ModelService.getInstance();
@@ -191,7 +205,7 @@ export class AgentService {
       new SystemMessage(`\`\`\`\n${diff}\n\`\`\``)
     ]);
     
-    this.logService.thinking(`Commit message: ${commitMsgResponse.content}`);
+    this.logService.internal(`Commit message: ${commitMsgResponse.content}`);
     
     // Convert MessageContent to string
     const commitMessage = typeof commitMsgResponse.content === 'string' 
@@ -215,5 +229,52 @@ export class AgentService {
     const currentBranch = await GitService.getCurrentBranch();
     const parentBranch = currentBranch.replace(`durrsor-${threadId}`, '');
     return await GitService.squashAndMergeToBranch(parentBranch, commitMessage);
+  }
+
+  /**
+   * Restore the agent to a checkpoint associated with a specific commit hash
+   * 
+   * @param commitHash The git commit hash to restore to
+   * @param threadId The thread ID for the conversation
+   * @returns The updated configuration for subsequent agent operations, or null if restore failed
+   */
+  async restoreToCheckpoint(commitHash: string, threadId: string): Promise<any | null> {
+    try {
+      this.logService.internal(`Restoring agent to commit: ${commitHash}`);
+      
+      // Find the checkpoint ID associated with this commit hash
+      const checkpointId = this.commitHashToCheckpointId.get(commitHash);
+      
+      if (!checkpointId) {
+        this.logService.internal(`No checkpoint found for commit hash: ${commitHash}`);
+        return null;
+      }
+      
+      this.logService.internal(`Found checkpoint ID: ${checkpointId} for commit: ${commitHash}`);
+      
+      // Reset the agent to the checkpoint ID
+      const updatedConfig = await this.agent.resetAgentToCheckpointId(threadId, checkpointId);
+      
+      if (!updatedConfig) {
+        this.logService.internal(`Failed to reset agent to checkpoint: ${checkpointId}`);
+        return null;
+      }
+      
+      this.logService.internal(`Successfully restored agent to checkpoint for commit: ${commitHash}`);
+      return updatedConfig;
+    } catch (error) {
+      this.logService.internal(`Error restoring to checkpoint for commit ${commitHash}: ${error}`);
+      return null;
+    }
+  }
+  
+  /**
+   * Get the current state for a thread
+   * 
+   * @param threadId The thread ID
+   * @returns The current state for the thread
+   */
+  async getState(threadId: string): Promise<GraphStateType | null> {
+    return await this.agent.getState(threadId);
   }
 } 

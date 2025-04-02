@@ -134,6 +134,16 @@ export class GitService {
         console.log(`GitService: Attempting to get commit hash`);
         const head = await gitData.repo.getCommit('HEAD');
         console.log(`GitService: Successfully got commit hash: ${head.hash}`);
+        
+        // Verify that the working tree is clean after commit
+        console.log(`GitService: Verifying working tree is clean after commit`);
+        const isClean = await this.isWorkingTreeClean();
+        if (!isClean) {
+          console.error(`GitService: Working tree is not clean after commit`);
+          throw new Error("Working tree is not clean after commit. Some changes were not committed.");
+        }
+        console.log(`GitService: Working tree is clean after commit`);
+        
         return head.hash;
       } catch (error: any) {
         console.error(`GitService: Error in git operation: ${error.message}`, error);
@@ -305,6 +315,52 @@ export class GitService {
     } catch (error: any) {
       console.error('Error during squash merge:', error);
       return `Error during squash merge: ${error.message}`;
+    }
+  }
+
+  /**
+   * Reset to a specific commit with a hard reset (discards all changes)
+   * 
+   * @param commitHash The commit hash to reset to
+   * @returns Success or error message from the git operation
+   */
+  public static async resetToCommit(commitHash: string): Promise<string> {
+    try {
+      console.log(`GitService: Starting resetToCommit with hash: "${commitHash}"`);
+      
+      const gitData = this.getGitRepo();
+      if (!gitData) {
+        console.log(`GitService: Git extension not available`);
+        return "Error: Git extension not available";
+      }
+      
+      console.log(`GitService: Got repository: ${gitData.repo.rootUri.fsPath}`);
+      
+      // Log repository state
+      console.log(`GitService: Repository state before reset:`, {
+        headSHA: gitData.repo.state.HEAD?.commit || 'unknown',
+        branch: gitData.repo.state.HEAD?.name || 'unknown',
+        workingTreeChanges: (gitData.repo.state.workingTreeChanges || []).length
+      });
+      
+      // Perform a hard reset by checking out the commit
+      // Note: VSCode Git API doesn't have a direct reset method, but checkout with hard option is equivalent
+      await gitData.repo.checkout(commitHash, { hard: true });
+      
+      console.log(`GitService: Successfully reset to commit: ${commitHash}`);
+      
+      // Log repository state after reset
+      console.log(`GitService: Repository state after reset:`, {
+        headSHA: gitData.repo.state.HEAD?.commit || 'unknown',
+        branch: gitData.repo.state.HEAD?.name || 'unknown',
+        workingTreeChanges: (gitData.repo.state.workingTreeChanges || []).length
+      });
+      
+      return `Reset to commit ${commitHash} successful`;
+    } catch (error: any) {
+      console.error('GitService: Error resetting to commit:', error);
+      console.error(`GitService: Error stack: ${error.stack}`);
+      return `Error resetting to commit: ${error.message}`;
     }
   }
 } 

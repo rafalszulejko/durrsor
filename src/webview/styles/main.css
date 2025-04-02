@@ -416,4 +416,45 @@ code {
 /* Remove old loading indicator styles */
 .loading-indicator {
   display: none;
+}
+
+.git-checkpoint {
+    padding: 12px;
+    margin: 8px 0;
+    border: 1px solid var(--vscode-textSeparator-foreground);
+    border-radius: 4px;
+}
+
+.git-checkpoint .tool-frame {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.git-checkpoint .tool-name {
+    color: var(--vscode-textLink-foreground);
+    font-weight: 500;
+}
+
+.git-checkpoint .restore-button {
+    padding: 4px 8px;
+    background-color: var(--vscode-button-background);
+    color: var(--vscode-button-foreground);
+    border: none;
+    border-radius: 2px;
+    cursor: pointer;
+}
+
+.git-checkpoint .restore-button:hover {
+    background-color: var(--vscode-button-hoverBackground);
+}
+
+.git-checkpoint .commit-hash {
+    font-family: var(--vscode-editor-font-family);
+    font-size: 0.9em;
+    color: var(--vscode-textPreformat-foreground);
+    padding: 4px 8px;
+    background-color: var(--vscode-editor-background);
+    border-radius: 2px;
 } 

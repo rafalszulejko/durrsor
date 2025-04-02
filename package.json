@@ -71,6 +71,21 @@
           "type": "boolean",
           "default": true,
           "description": "Whether to save logs to file during agent execution"
+        },
+        "durrsor.langsmith.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "API key for LangSmith tracing and monitoring"
+        },
+        "durrsor.langsmith.endpoint": {
+          "type": "string",
+          "default": "https://api.smith.langchain.com",
+          "description": "LangSmith API endpoint URL"
+        },
+        "durrsor.langsmith.tracing": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable LangSmith tracing functionality"
         }
       }
     }
