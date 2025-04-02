@@ -134,6 +134,16 @@ export class GitService {
         console.log(`GitService: Attempting to get commit hash`);
         const head = await gitData.repo.getCommit('HEAD');
         console.log(`GitService: Successfully got commit hash: ${head.hash}`);
+        
+        // Verify that the working tree is clean after commit
+        console.log(`GitService: Verifying working tree is clean after commit`);
+        const isClean = await this.isWorkingTreeClean();
+        if (!isClean) {
+          console.error(`GitService: Working tree is not clean after commit`);
+          throw new Error("Working tree is not clean after commit. Some changes were not committed.");
+        }
+        console.log(`GitService: Working tree is clean after commit`);
+        
         return head.hash;
       } catch (error: any) {
         console.error(`GitService: Error in git operation: ${error.message}`, error);
