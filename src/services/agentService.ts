@@ -200,7 +200,7 @@ export class AgentService {
     
     // Generate commit message
     const commitMsgResponse = await model.invoke([
-      new SystemMessage("You are an expert at summarizing code changes. Summarize the changes made in the following diff."),
+      new SystemMessage("You are a senior software engineer. You are given a user request and a diff of the changes made to the code. You are to generate a commit message for the changes."),
       new SystemMessage(`User request: ${latestUserMessage.content}`),
       new SystemMessage(`\`\`\`\n${diff}\n\`\`\``)
     ]);
