@@ -16,10 +16,34 @@ export class AgentService {
   private _onMessageChunkReceived = new vscode.EventEmitter<{content: string, id: string}>();
   public readonly onMessageChunkReceived = this._onMessageChunkReceived.event;
   private commitHashToCheckpointId: Map<string, string> = new Map();
+  private parentBranchMap: Map<string, string> = new Map(); // Map to store threadId to parent branch name
+  private parentCommitHashMap: Map<string, string> = new Map(); // Map to store threadId to parent commit hash
   
   constructor() {
     this.logService = LogService.getInstance();
     this.agent = new CodeAgent();
+  }
+  
+  /**
+   * Save parent branch name and commit hash for a thread
+   * 
+   * @param threadId The thread ID to save parent info for
+   * @private
+   */
+  private async saveParentInfo(threadId: string): Promise<void> {
+    try {
+      // Get the current branch name
+      const parentBranch = await GitService.getCurrentBranch();
+      this.logService.internal(`Saving parent branch: ${parentBranch} for thread: ${threadId}`);
+      this.parentBranchMap.set(threadId, parentBranch);
+      
+      // Get the current HEAD commit hash
+      const parentCommitHash = await GitService.getHeadCommitHash();
+      this.logService.internal(`Saving parent commit hash: ${parentCommitHash} for thread: ${threadId}`);
+      this.parentCommitHashMap.set(threadId, parentCommitHash);
+    } catch (error) {
+      this.logService.internal(`Error saving parent branch or commit hash: ${error}`);
+    }
   }
   
   /**
@@ -43,6 +67,10 @@ export class AgentService {
     // Create or use existing thread ID and Git branch
     if (!threadId) {
       threadId = uuidv4();
+      
+      // Save parent branch name and commit hash before creating a new branch
+      await this.saveParentInfo(threadId);
+      
       // Create new branch for this thread
       this.logService.internal(`Creating branch for thread: ${threadId}`);
       await GitService.createAndCheckoutBranch(threadId);

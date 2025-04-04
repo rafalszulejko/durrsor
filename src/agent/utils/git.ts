@@ -225,25 +225,46 @@ export class GitService {
   /**
    * Get the name of the current git branch.
    * 
-   * @returns The name of the current branch as a string, or error message if failed
+   * @returns The name of the current branch
+   * @throws Error if Git extension is not available or current branch cannot be determined
    */
   public static async getCurrentBranch(): Promise<string> {
-    try {
-      const gitData = this.getGitRepo();
-      if (!gitData) {
-        return "Error: Git extension not available";
-      }
-      
-      // Get the current branch
-      const head = gitData.repo.state.HEAD;
-      if (head && head.name) {
-        return head.name;
-      } else {
-        return "Error: Could not determine current branch";
-      }
-    } catch (error: any) {
-      console.error('Error getting current branch:', error);
-      return `Error getting current branch: ${error.message}`;
+    const gitData = this.getGitRepo();
+    if (!gitData) {
+      console.error('Error getting current branch: Git extension not available');
+      throw new Error("Git extension not available");
+    }
+    
+    // Get the current branch
+    const head = gitData.repo.state.HEAD;
+    if (head && head.name) {
+      return head.name;
+    } else {
+      console.error('Error getting current branch: Could not determine current branch');
+      throw new Error("Could not determine current branch");
+    }
+  }
+
+  /**
+   * Get the hash of the latest commit (HEAD).
+   * 
+   * @returns The hash of the HEAD commit
+   * @throws Error if Git extension is not available or HEAD commit cannot be determined
+   */
+  public static async getHeadCommitHash(): Promise<string> {
+    const gitData = this.getGitRepo();
+    if (!gitData) {
+      console.error('Error getting HEAD commit hash: Git extension not available');
+      throw new Error("Git extension not available");
+    }
+    
+    // Get the HEAD commit hash directly from repository state
+    const head = gitData.repo.state.HEAD;
+    if (head && head.commit) {
+      return head.commit;
+    } else {
+      console.error('Error getting HEAD commit hash: Could not determine HEAD commit');
+      throw new Error("Could not determine HEAD commit");
     }
   }
 
