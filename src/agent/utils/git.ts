@@ -343,9 +343,20 @@ export class GitService {
         workingTreeChanges: (gitData.repo.state.workingTreeChanges || []).length
       });
       
-      // Perform a hard reset by checking out the commit
-      // Note: VSCode Git API doesn't have a direct reset method, but checkout with hard option is equivalent
-      await gitData.repo.checkout(commitHash, { hard: true });
+      // The VSCode Git API doesn't have a direct reset method that can keep us on the branch
+      // Use runTerminalCommand to execute the git reset --hard directly
+      // This command keeps the branch pointer and just moves it to the specified commit
+      const workspacePath = gitData.repo.rootUri.fsPath;
+      
+      // Create and execute the git reset command via terminal
+      const command = `cd "${workspacePath}" && git reset --hard ${commitHash}`;
+      console.log(`GitService: Executing command: ${command}`);
+      
+      // Use executeCommand to run the git reset command
+      await vscode.commands.executeCommand('workbench.action.terminal.sendSequence', { text: `${command}\n` });
+      
+      // Manually refresh the git state since we're using external commands
+      await gitData.repo.status();
       
       console.log(`GitService: Successfully reset to commit: ${commitHash}`);
       
