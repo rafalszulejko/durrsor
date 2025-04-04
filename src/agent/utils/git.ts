@@ -277,65 +277,46 @@ export class GitService {
    */
   public static async squashAndMergeToBranch(
     targetBranch: string, 
-    commitMessage?: string
-  ): Promise<string> {
+    commitMessage: string
+  ): Promise<void> {
+    console.log(`GitService: Starting squashAndMergeToBranch to ${targetBranch}`);
+    
+    const gitData = this.getGitRepo();
+    if (!gitData) {
+      console.log(`GitService: Git extension not available`);
+      throw new Error("Git extension not available");
+    }
+    
+    // First ensure working tree is clean
+    const isClean = await this.isWorkingTreeClean();
+    if (!isClean) {
+      console.log(`GitService: Working tree is not clean`);
+      throw new Error("Working tree is not clean. Please commit or stash changes first.");
+    }
+    
+    // Get current branch name
+    let currentBranch = await this.getCurrentBranch();
     try {
-      const gitData = this.getGitRepo();
-      if (!gitData) {
-        return "Error: Git extension not available";
-      }
-      
-      // First ensure working tree is clean
-      const isClean = await this.isWorkingTreeClean();
-      if (!isClean) {
-        return "Error: Working tree is not clean. Please commit or stash changes first.";
-      }
-      
-      // Get current branch name
-      const currentBranch = await this.getCurrentBranch();
-      if (currentBranch.startsWith("Error")) {
-        return currentBranch;
-      }
-      
-      // If no commit message provided, create a default one
-      if (!commitMessage) {
-        commitMessage = `Squashed commits from ${currentBranch} into ${targetBranch}`;
-      }
-      
-      // Note: VSCode Git API doesn't directly support squash merge
-      // We'll need to use a combination of operations to achieve this
-      
-      // Store current changes
-      const changes = await gitData.repo.diff();
-      
-      // Checkout target branch
+      // 1. Check out the target branch - using Git API
+      console.log(`GitService: Checking out target branch ${targetBranch}`);
       await gitData.repo.checkout(targetBranch);
       
-      // Merge with squash (this is a limitation - VSCode API doesn't have direct squash merge)
-      // We'll need to apply the changes manually
-      try {
-        // This is a simplified approach - in a real implementation, you might need
-        // to handle conflicts and other edge cases
-        if (changes) {
-          // Apply changes to the target branch
-          // This is a simplified approach and may not work for all cases
-          await gitData.repo.apply(changes);
-          
-          // Commit the changes
-          await gitData.repo.commit(commitMessage);
-        }
-        
-        // Get the commit hash
-        const head = await gitData.repo.getCommit('HEAD');
-        
-        return `Successfully applied changes from ${currentBranch} to ${targetBranch}\nCommit: ${head.hash}`;
-      } catch (error: any) {
-        console.error('Error during squash merge:', error);
-        return `Error during squash merge: ${error.message}`;
-      }
+      // 2. Merge with squash using command line (this adds the changes to the index but doesn't commit)
+      console.log(`GitService: Executing git merge --squash ${currentBranch}`);
+      const mergeCommand = `cd "${gitData.repo.rootUri.fsPath}" && git merge --squash ${currentBranch}`;
+      await vscode.commands.executeCommand('workbench.action.terminal.sendSequence', { text: `${mergeCommand}\n` });
+      
+      // Wait a bit for the command to complete
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Refresh git state to reflect the changes from the command line operation
+      await gitData.repo.status();
+      
+      await gitData.repo.commit(commitMessage);
     } catch (error: any) {
-      console.error('Error during squash merge:', error);
-      return `Error during squash merge: ${error.message}`;
+      console.error(`GitService: Error during squash merge: ${error.message}`);
+      console.error(`GitService: Error stack: ${error.stack}`);
+      throw error;
     }
   }
 
