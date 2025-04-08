@@ -40,6 +40,22 @@ body {
   justify-content: flex-end;
 }
 
+/* Accept button */
+.accept-button {
+  background-color: var(--vscode-button-background);
+  color: var(--vscode-button-foreground);
+  border: none;
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.accept-button:hover {
+  background-color: var(--vscode-button-hoverBackground);
+}
+
 .icon-button {
   background: none;
   border: none;

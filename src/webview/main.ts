@@ -74,12 +74,16 @@ interface Log {
   const bigModelNameElement = document.getElementById('bigModelName');
   const chatTitleElement = document.getElementById('chatTitle');
   const settingsButton = document.getElementById('settingsButton');
+  const acceptButton = document.getElementById('acceptButton');
   
   // Initialize loading indicator
   const loadingIndicator = new LoadingIndicator();
   if (sendButtonContainer) {
     sendButtonContainer.appendChild(loadingIndicator.getElement());
   }
+  
+  // Initialize chat title and ensure accept button is hidden
+  updateChatTitle();
   
   // Define the type for our custom event
   interface GitCheckpointRestoreEvent extends CustomEvent {
@@ -158,6 +162,13 @@ interface Log {
     vscode.postMessage({ command: 'openSettings' });
   });
   
+  // Accept button event listener
+  acceptButton?.addEventListener('click', () => {
+    vscode.postMessage({ 
+      command: 'acceptChanges'
+    });
+  });
+  
   // Handle messages from extension
   window.addEventListener('message', (event) => {
     const message = event.data;
@@ -197,6 +208,9 @@ interface Log {
         if (message.threadId) {
           updateChatTitle(message.threadId);
         }
+        break;
+      case 'changesAccepted':
+        resetWebview();
         break;
     }
   });
@@ -326,8 +340,17 @@ interface Log {
     }
   }
   
-  function updateChatTitle(threadId: string) {
-    if (!chatTitleElement) return;
+  function updateChatTitle(threadId?: string) {
+    if (!chatTitleElement || !acceptButton) return;
+    
+    if (!threadId) {
+      // Reset the chat title
+      chatTitleElement.textContent = 'New chat';
+      
+      // Hide the accept button when there's no thread
+      acceptButton.style.display = 'none';
+      return;
+    }
     
     // Extract the first part of the thread ID before the first dash
     // If no dash, use the whole ID
@@ -335,6 +358,22 @@ interface Log {
     
     // Update the chat title
     chatTitleElement.textContent = `Chat ${chatId}`;
+    
+    // Show the accept button when we have a thread
+    acceptButton.style.display = 'block';
+  }
+  
+  function resetWebview() {
+    // Clear all messages
+    if (chatContainer) {
+      chatContainer.innerHTML = '';
+    }
+    
+    // Reset selected files
+    updateSelectedFiles([]);
+    
+    // Reset chat title and hide accept button
+    updateChatTitle();
   }
   
   function showLoadingIndicator() {

@@ -13,7 +13,9 @@ export function getLayout(webview: vscode.Webview, nonce: string, stylePath: vsc
 		</head>
 		<body>
 			<div class="nav-container">
-				<div class="nav-left"></div>
+				<div class="nav-left">
+					<button id="acceptButton" class="accept-button" style="display: none;">Accept</button>
+				</div>
 				<div class="nav-title" id="chatTitle">New chat</div>
 				<div class="nav-right">
 					<button id="settingsButton" class="icon-button">

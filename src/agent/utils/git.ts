@@ -376,4 +376,40 @@ export class GitService {
       return `Error resetting to commit: ${error.message}`;
     }
   }
+
+  /**
+   * Get list of commits on the current branch since the given commit hash
+   * 
+   * @param sinceCommitHash The starting commit hash to get commits since 
+   * @param maxEntries Maximum number of commits to return (default is 50)
+   * @returns Array of Commit objects, or error message if operation fails
+   */
+  public static async getCommitsSince(sinceCommitHash: string, maxEntries: number = 50): Promise<any[]> {
+    try {
+      console.log(`GitService: Getting commits since ${sinceCommitHash}`);
+      
+      const gitData = this.getGitRepo();
+      if (!gitData) {
+        console.log(`GitService: Git extension not available`);
+        throw new Error("Git extension not available");
+      }
+      
+      // Format the range as "hash..HEAD" to get all commits since the given hash up to HEAD
+      const range = `${sinceCommitHash}..HEAD`;
+      
+      // Use the log method with a range option
+      const commits = await gitData.repo.log({
+        maxEntries: maxEntries,
+        range: range
+      });
+      
+      console.log(`GitService: Found ${commits.length} commits since ${sinceCommitHash}`);
+      
+      return commits;
+    } catch (error: any) {
+      console.error(`GitService: Error getting commits: ${error.message}`);
+      console.error(`GitService: Error stack: ${error.stack}`);
+      throw error;
+    }
+  }
 } 

@@ -126,6 +126,9 @@ class DurrsorViewProvider implements vscode.WebviewViewProvider {
 			case 'openSettings':
 				await vscode.commands.executeCommand('workbench.action.openSettings', 'durrsor');
 				break;
+			case 'acceptChanges':
+				await this._handleAcceptChanges();
+				break;
 		}
 	}
 
@@ -315,6 +318,54 @@ class DurrsorViewProvider implements vscode.WebviewViewProvider {
 			this._view?.webview.postMessage({ 
 				command: 'checkpointRestored', 
 				commitHash: commitHash,
+				success: false,
+				error: error.message 
+			});
+			
+			// Hide loading indicator
+			this._view?.webview.postMessage({ command: 'hideLoading' });
+		}
+	}
+
+	private async _handleAcceptChanges() {
+		// Show loading indicator
+		this._view?.webview.postMessage({ command: 'showLoading' });
+		
+		// Get threadId from previous state
+		const threadId = this._previousState?.thread_id;
+		
+		try {
+			if (!threadId) {
+				throw new Error('No active thread ID found');
+			}
+			
+			this._logService.internal(`Accepting changes for thread: ${threadId}`);
+			
+			// Perform the accept changes operation - will throw if it fails
+			await this._agentService.acceptChanges(threadId);
+			
+			this._logService.internal(`Changes accepted successfully for thread: ${threadId}`);
+			
+			// Clear previous state and updated config to start fresh
+			this._previousState = undefined;
+			this._updatedConfig = undefined;
+			
+			this._view?.webview.postMessage({ 
+				command: 'changesAccepted', 
+				threadId: threadId || '',
+				success: true 
+			});
+			
+			// Hide loading indicator
+			this._view?.webview.postMessage({ command: 'hideLoading' });
+		} catch (error: any) {
+			console.error('Error accepting changes:', error);
+			this._logService.error('extension', `Error accepting changes: ${error.message || 'An unknown error occurred'}`);
+			
+			// Notify webview of failure
+			this._view?.webview.postMessage({ 
+				command: 'changesAccepted', 
+				threadId: threadId || '',
 				success: false,
 				error: error.message 
 			});

@@ -253,10 +253,12 @@ export class AgentService {
    * @param commitMessage Optional custom commit message
    * @returns Result of the squash merge operation
    */
-  async squashAndMergeToParent(threadId: string, commitMessage?: string): Promise<string> {
-    const currentBranch = await GitService.getCurrentBranch();
-    const parentBranch = currentBranch.replace(`durrsor-${threadId}`, '');
-    return await GitService.squashAndMergeToBranch(parentBranch, commitMessage);
+  async squashAndMergeToParent(threadId: string, commitMessage: string): Promise<void> {
+    const parentBranch = this.parentBranchMap.get(threadId);
+    if (!parentBranch) {
+      throw new Error(`No parent branch found for thread: ${threadId}`);
+    }
+    await GitService.squashAndMergeToBranch(parentBranch, commitMessage);
   }
 
   /**
@@ -304,5 +306,43 @@ export class AgentService {
    */
   async getState(threadId: string): Promise<GraphStateType | null> {
     return await this.agent.getState(threadId);
+  }
+  
+  /**
+   * Accept changes by squashing and merging to parent branch
+   * 
+   * @param threadId The thread ID
+   * @throws Error if operation fails
+   */
+  async acceptChanges(threadId: string): Promise<void> {
+    this.logService.internal(`Accepting changes for thread: ${threadId}`);
+    
+    // Get parent branch and commit hash for this thread
+    const parentBranch = this.parentBranchMap.get(threadId);
+    const parentCommitHash = this.parentCommitHashMap.get(threadId);
+    
+    if (!parentBranch || !parentCommitHash) {
+      throw new Error(`No parent branch or commit hash found for thread: ${threadId}`);
+    }
+    
+    this.logService.internal(`Parent branch: ${parentBranch}, parent commit hash: ${parentCommitHash}`);
+    
+    // Get all commits since the parent commit
+    const commits = await GitService.getCommitsSince(parentCommitHash);
+    
+    // Generate merge commit message by concatenating all commit messages
+    let mergeCommitMessage = "Merged changes from thread: " + threadId;
+    
+    if (commits.length > 0) {
+      mergeCommitMessage += "\n\nChanges include:\n";
+      for (const commit of commits) {
+        mergeCommitMessage += `- ${commit.message}\n`;
+      }
+    }
+    
+    // Squash and merge changes to parent branch
+    await this.squashAndMergeToParent(threadId, mergeCommitMessage);
+    
+    this.logService.internal(`Successfully accepted changes for thread: ${threadId}`);
   }
 } 
