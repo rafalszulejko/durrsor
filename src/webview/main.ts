@@ -75,6 +75,7 @@ interface Log {
   const chatTitleElement = document.getElementById('chatTitle');
   const settingsButton = document.getElementById('settingsButton');
   const acceptButton = document.getElementById('acceptButton');
+  const rejectButton = document.getElementById('rejectButton');
   
   // Initialize loading indicator
   const loadingIndicator = new LoadingIndicator();
@@ -169,6 +170,13 @@ interface Log {
     });
   });
   
+  // Reject button event listener
+  rejectButton?.addEventListener('click', () => {
+    vscode.postMessage({ 
+      command: 'rejectChanges'
+    });
+  });
+  
   // Handle messages from extension
   window.addEventListener('message', (event) => {
     const message = event.data;
@@ -210,6 +218,9 @@ interface Log {
         }
         break;
       case 'changesAccepted':
+        resetWebview();
+        break;
+      case 'changesRejected':
         resetWebview();
         break;
     }
@@ -341,14 +352,15 @@ interface Log {
   }
   
   function updateChatTitle(threadId?: string) {
-    if (!chatTitleElement || !acceptButton) return;
+    if (!chatTitleElement || !acceptButton || !rejectButton) return;
     
     if (!threadId) {
       // Reset the chat title
       chatTitleElement.textContent = 'New chat';
       
-      // Hide the accept button when there's no thread
+      // Hide the accept and reject buttons when there's no thread
       acceptButton.style.display = 'none';
+      rejectButton.style.display = 'none';
       return;
     }
     
@@ -359,8 +371,9 @@ interface Log {
     // Update the chat title
     chatTitleElement.textContent = `Chat ${chatId}`;
     
-    // Show the accept button when we have a thread
+    // Show the accept and reject buttons when we have a thread
     acceptButton.style.display = 'block';
+    rejectButton.style.display = 'block';
   }
   
   function resetWebview() {

@@ -129,6 +129,9 @@ class DurrsorViewProvider implements vscode.WebviewViewProvider {
 			case 'acceptChanges':
 				await this._handleAcceptChanges();
 				break;
+			case 'rejectChanges':
+				await this._handleRejectChanges();
+				break;
 		}
 	}
 
@@ -365,6 +368,54 @@ class DurrsorViewProvider implements vscode.WebviewViewProvider {
 			// Notify webview of failure
 			this._view?.webview.postMessage({ 
 				command: 'changesAccepted', 
+				threadId: threadId || '',
+				success: false,
+				error: error.message 
+			});
+			
+			// Hide loading indicator
+			this._view?.webview.postMessage({ command: 'hideLoading' });
+		}
+	}
+
+	private async _handleRejectChanges() {
+		// Show loading indicator
+		this._view?.webview.postMessage({ command: 'showLoading' });
+		
+		// Get threadId from previous state
+		const threadId = this._previousState?.thread_id;
+		
+		try {
+			if (!threadId) {
+				throw new Error('No active thread ID found');
+			}
+			
+			this._logService.internal(`Rejecting changes for thread: ${threadId}`);
+			
+			// Perform the reject changes operation - will throw if it fails
+			await this._agentService.rejectChanges(threadId);
+			
+			this._logService.internal(`Changes rejected successfully for thread: ${threadId}`);
+			
+			// Clear previous state and updated config to start fresh
+			this._previousState = undefined;
+			this._updatedConfig = undefined;
+			
+			this._view?.webview.postMessage({ 
+				command: 'changesRejected', 
+				threadId: threadId || '',
+				success: true 
+			});
+			
+			// Hide loading indicator
+			this._view?.webview.postMessage({ command: 'hideLoading' });
+		} catch (error: any) {
+			console.error('Error rejecting changes:', error);
+			this._logService.error('extension', `Error rejecting changes: ${error.message || 'An unknown error occurred'}`);
+			
+			// Notify webview of failure
+			this._view?.webview.postMessage({ 
+				command: 'changesRejected', 
 				threadId: threadId || '',
 				success: false,
 				error: error.message 

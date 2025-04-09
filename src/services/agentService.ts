@@ -345,4 +345,32 @@ export class AgentService {
     
     this.logService.internal(`Successfully accepted changes for thread: ${threadId}`);
   }
+
+  /**
+   * Reject changes by checking out parent branch and cleaning up
+   * 
+   * @param threadId The thread ID
+   * @throws Error if operation fails
+   */
+  async rejectChanges(threadId: string): Promise<void> {
+    this.logService.internal(`Rejecting changes for thread: ${threadId}`);
+    
+    // Get parent branch for this thread
+    const parentBranch = this.parentBranchMap.get(threadId);
+    
+    if (!parentBranch) {
+      throw new Error(`No parent branch found for thread: ${threadId}`);
+    }
+    
+    this.logService.internal(`Parent branch: ${parentBranch}`);
+    
+    // Reject changes by checking out parent branch
+    const result = await GitService.rejectChanges(parentBranch);
+    
+    if (result.startsWith('Error:')) {
+      throw new Error(result);
+    }
+    
+    this.logService.internal(`Successfully rejected changes for thread: ${threadId}`);
+  }
 } 

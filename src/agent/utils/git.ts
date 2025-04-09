@@ -412,4 +412,37 @@ export class GitService {
       throw error;
     }
   }
+
+  /**
+   * Reject changes by checking out parent branch and cleaning up
+   * 
+   * @param parentBranch The parent branch to checkout
+   * @returns Success or error message from the git operation
+   */
+  public static async rejectChanges(parentBranch: string): Promise<string> {
+    try {
+      console.log(`GitService: Starting rejectChanges to parent branch: ${parentBranch}`);
+      
+      const gitData = this.getGitRepo();
+      if (!gitData) {
+        console.log(`GitService: Git extension not available`);
+        return "Error: Git extension not available";
+      }
+      
+      // First checkout the parent branch
+      console.log(`GitService: Checking out parent branch: ${parentBranch}`);
+      await gitData.repo.checkout(parentBranch);
+      
+      // Refresh git state
+      await gitData.repo.status();
+      
+      console.log(`GitService: Successfully rejected changes and checked out parent branch: ${parentBranch}`);
+      
+      return `Successfully rejected changes and checked out parent branch: ${parentBranch}`;
+    } catch (error: any) {
+      console.error('GitService: Error rejecting changes:', error);
+      console.error(`GitService: Error stack: ${error.stack}`);
+      return `Error rejecting changes: ${error.message}`;
+    }
+  }
 } 
