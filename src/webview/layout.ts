@@ -12,19 +12,6 @@ export function getLayout(webview: vscode.Webview, nonce: string, stylePath: vsc
 			<link rel="stylesheet" href="${stylePath}">
 		</head>
 		<body>
-			<div class="nav-container">
-				<div class="nav-left">
-					<button id="rejectButton" class="reject-button" style="display: none;">Reject</button>
-					<button id="acceptButton" class="accept-button" style="display: none;">Accept</button>
-				</div>
-				<div class="nav-title" id="chatTitle">New chat</div>
-				<div class="nav-right">
-					<button id="settingsButton" class="icon-button">
-						<span class="codicon codicon-settings-gear"></span>
-					</button>
-				</div>
-			</div>
-			
 			<div class="chat-container" id="chatContainer"></div>
 			
 			<div class="input-container">
@@ -33,7 +20,23 @@ export function getLayout(webview: vscode.Webview, nonce: string, stylePath: vsc
 				</div>
 				
 				<div class="prompt-container">
+					<div class="navbar-panel">
+						<button id="settingsButton" class="icon-button">
+							<span class="codicon codicon-settings-gear"></span>
+						</button>
+						<div class="nav-title" id="chatTitle">New chat</div>
+						<div class="action-buttons">
+							<button id="rejectButton" class="icon-button" style="display: none;">
+								<span class="codicon codicon-close"></span>
+							</button>
+							<button id="acceptButton" class="icon-button" style="display: none;">
+								<span class="codicon codicon-check"></span>
+							</button>
+						</div>
+					</div>
+					
 					<textarea id="promptInput" placeholder="Ask a question..."></textarea>
+					
 					<div class="controls-panel">
 						<button id="selectFilesButton" class="file-select-button">
 							<span class="codicon codicon-add"></span>
