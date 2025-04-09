@@ -225,25 +225,46 @@ export class GitService {
   /**
    * Get the name of the current git branch.
    * 
-   * @returns The name of the current branch as a string, or error message if failed
+   * @returns The name of the current branch
+   * @throws Error if Git extension is not available or current branch cannot be determined
    */
   public static async getCurrentBranch(): Promise<string> {
-    try {
-      const gitData = this.getGitRepo();
-      if (!gitData) {
-        return "Error: Git extension not available";
-      }
-      
-      // Get the current branch
-      const head = gitData.repo.state.HEAD;
-      if (head && head.name) {
-        return head.name;
-      } else {
-        return "Error: Could not determine current branch";
-      }
-    } catch (error: any) {
-      console.error('Error getting current branch:', error);
-      return `Error getting current branch: ${error.message}`;
+    const gitData = this.getGitRepo();
+    if (!gitData) {
+      console.error('Error getting current branch: Git extension not available');
+      throw new Error("Git extension not available");
+    }
+    
+    // Get the current branch
+    const head = gitData.repo.state.HEAD;
+    if (head && head.name) {
+      return head.name;
+    } else {
+      console.error('Error getting current branch: Could not determine current branch');
+      throw new Error("Could not determine current branch");
+    }
+  }
+
+  /**
+   * Get the hash of the latest commit (HEAD).
+   * 
+   * @returns The hash of the HEAD commit
+   * @throws Error if Git extension is not available or HEAD commit cannot be determined
+   */
+  public static async getHeadCommitHash(): Promise<string> {
+    const gitData = this.getGitRepo();
+    if (!gitData) {
+      console.error('Error getting HEAD commit hash: Git extension not available');
+      throw new Error("Git extension not available");
+    }
+    
+    // Get the HEAD commit hash directly from repository state
+    const head = gitData.repo.state.HEAD;
+    if (head && head.commit) {
+      return head.commit;
+    } else {
+      console.error('Error getting HEAD commit hash: Could not determine HEAD commit');
+      throw new Error("Could not determine HEAD commit");
     }
   }
 
@@ -256,65 +277,46 @@ export class GitService {
    */
   public static async squashAndMergeToBranch(
     targetBranch: string, 
-    commitMessage?: string
-  ): Promise<string> {
+    commitMessage: string
+  ): Promise<void> {
+    console.log(`GitService: Starting squashAndMergeToBranch to ${targetBranch}`);
+    
+    const gitData = this.getGitRepo();
+    if (!gitData) {
+      console.log(`GitService: Git extension not available`);
+      throw new Error("Git extension not available");
+    }
+    
+    // First ensure working tree is clean
+    const isClean = await this.isWorkingTreeClean();
+    if (!isClean) {
+      console.log(`GitService: Working tree is not clean`);
+      throw new Error("Working tree is not clean. Please commit or stash changes first.");
+    }
+    
+    // Get current branch name
+    let currentBranch = await this.getCurrentBranch();
     try {
-      const gitData = this.getGitRepo();
-      if (!gitData) {
-        return "Error: Git extension not available";
-      }
-      
-      // First ensure working tree is clean
-      const isClean = await this.isWorkingTreeClean();
-      if (!isClean) {
-        return "Error: Working tree is not clean. Please commit or stash changes first.";
-      }
-      
-      // Get current branch name
-      const currentBranch = await this.getCurrentBranch();
-      if (currentBranch.startsWith("Error")) {
-        return currentBranch;
-      }
-      
-      // If no commit message provided, create a default one
-      if (!commitMessage) {
-        commitMessage = `Squashed commits from ${currentBranch} into ${targetBranch}`;
-      }
-      
-      // Note: VSCode Git API doesn't directly support squash merge
-      // We'll need to use a combination of operations to achieve this
-      
-      // Store current changes
-      const changes = await gitData.repo.diff();
-      
-      // Checkout target branch
+      // 1. Check out the target branch - using Git API
+      console.log(`GitService: Checking out target branch ${targetBranch}`);
       await gitData.repo.checkout(targetBranch);
       
-      // Merge with squash (this is a limitation - VSCode API doesn't have direct squash merge)
-      // We'll need to apply the changes manually
-      try {
-        // This is a simplified approach - in a real implementation, you might need
-        // to handle conflicts and other edge cases
-        if (changes) {
-          // Apply changes to the target branch
-          // This is a simplified approach and may not work for all cases
-          await gitData.repo.apply(changes);
-          
-          // Commit the changes
-          await gitData.repo.commit(commitMessage);
-        }
-        
-        // Get the commit hash
-        const head = await gitData.repo.getCommit('HEAD');
-        
-        return `Successfully applied changes from ${currentBranch} to ${targetBranch}\nCommit: ${head.hash}`;
-      } catch (error: any) {
-        console.error('Error during squash merge:', error);
-        return `Error during squash merge: ${error.message}`;
-      }
+      // 2. Merge with squash using command line (this adds the changes to the index but doesn't commit)
+      console.log(`GitService: Executing git merge --squash ${currentBranch}`);
+      const mergeCommand = `cd "${gitData.repo.rootUri.fsPath}" && git merge --squash ${currentBranch}`;
+      await vscode.commands.executeCommand('workbench.action.terminal.sendSequence', { text: `${mergeCommand}\n` });
+      
+      // Wait a bit for the command to complete
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Refresh git state to reflect the changes from the command line operation
+      await gitData.repo.status();
+      
+      await gitData.repo.commit(commitMessage);
     } catch (error: any) {
-      console.error('Error during squash merge:', error);
-      return `Error during squash merge: ${error.message}`;
+      console.error(`GitService: Error during squash merge: ${error.message}`);
+      console.error(`GitService: Error stack: ${error.stack}`);
+      throw error;
     }
   }
 
@@ -343,9 +345,20 @@ export class GitService {
         workingTreeChanges: (gitData.repo.state.workingTreeChanges || []).length
       });
       
-      // Perform a hard reset by checking out the commit
-      // Note: VSCode Git API doesn't have a direct reset method, but checkout with hard option is equivalent
-      await gitData.repo.checkout(commitHash, { hard: true });
+      // The VSCode Git API doesn't have a direct reset method that can keep us on the branch
+      // Use runTerminalCommand to execute the git reset --hard directly
+      // This command keeps the branch pointer and just moves it to the specified commit
+      const workspacePath = gitData.repo.rootUri.fsPath;
+      
+      // Create and execute the git reset command via terminal
+      const command = `cd "${workspacePath}" && git reset --hard ${commitHash}`;
+      console.log(`GitService: Executing command: ${command}`);
+      
+      // Use executeCommand to run the git reset command
+      await vscode.commands.executeCommand('workbench.action.terminal.sendSequence', { text: `${command}\n` });
+      
+      // Manually refresh the git state since we're using external commands
+      await gitData.repo.status();
       
       console.log(`GitService: Successfully reset to commit: ${commitHash}`);
       
@@ -361,6 +374,75 @@ export class GitService {
       console.error('GitService: Error resetting to commit:', error);
       console.error(`GitService: Error stack: ${error.stack}`);
       return `Error resetting to commit: ${error.message}`;
+    }
+  }
+
+  /**
+   * Get list of commits on the current branch since the given commit hash
+   * 
+   * @param sinceCommitHash The starting commit hash to get commits since 
+   * @param maxEntries Maximum number of commits to return (default is 50)
+   * @returns Array of Commit objects, or error message if operation fails
+   */
+  public static async getCommitsSince(sinceCommitHash: string, maxEntries: number = 50): Promise<any[]> {
+    try {
+      console.log(`GitService: Getting commits since ${sinceCommitHash}`);
+      
+      const gitData = this.getGitRepo();
+      if (!gitData) {
+        console.log(`GitService: Git extension not available`);
+        throw new Error("Git extension not available");
+      }
+      
+      // Format the range as "hash..HEAD" to get all commits since the given hash up to HEAD
+      const range = `${sinceCommitHash}..HEAD`;
+      
+      // Use the log method with a range option
+      const commits = await gitData.repo.log({
+        maxEntries: maxEntries,
+        range: range
+      });
+      
+      console.log(`GitService: Found ${commits.length} commits since ${sinceCommitHash}`);
+      
+      return commits;
+    } catch (error: any) {
+      console.error(`GitService: Error getting commits: ${error.message}`);
+      console.error(`GitService: Error stack: ${error.stack}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Reject changes by checking out parent branch and cleaning up
+   * 
+   * @param parentBranch The parent branch to checkout
+   * @returns Success or error message from the git operation
+   */
+  public static async rejectChanges(parentBranch: string): Promise<string> {
+    try {
+      console.log(`GitService: Starting rejectChanges to parent branch: ${parentBranch}`);
+      
+      const gitData = this.getGitRepo();
+      if (!gitData) {
+        console.log(`GitService: Git extension not available`);
+        return "Error: Git extension not available";
+      }
+      
+      // First checkout the parent branch
+      console.log(`GitService: Checking out parent branch: ${parentBranch}`);
+      await gitData.repo.checkout(parentBranch);
+      
+      // Refresh git state
+      await gitData.repo.status();
+      
+      console.log(`GitService: Successfully rejected changes and checked out parent branch: ${parentBranch}`);
+      
+      return `Successfully rejected changes and checked out parent branch: ${parentBranch}`;
+    } catch (error: any) {
+      console.error('GitService: Error rejecting changes:', error);
+      console.error(`GitService: Error stack: ${error.stack}`);
+      return `Error rejecting changes: ${error.message}`;
     }
   }
 } 

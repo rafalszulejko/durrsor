@@ -24,9 +24,6 @@ export const GraphState = Annotation.Root({
   // Thread ID for conversation tracking
   thread_id: Annotation<string>(),
   
-  // Parent branch name
-  parent_branch: Annotation<string>(),
-  
   // Diff content showing changes
   diff: Annotation<string>(),
   

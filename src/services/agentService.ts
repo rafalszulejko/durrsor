@@ -16,10 +16,34 @@ export class AgentService {
   private _onMessageChunkReceived = new vscode.EventEmitter<{content: string, id: string}>();
   public readonly onMessageChunkReceived = this._onMessageChunkReceived.event;
   private commitHashToCheckpointId: Map<string, string> = new Map();
+  private parentBranchMap: Map<string, string> = new Map(); // Map to store threadId to parent branch name
+  private parentCommitHashMap: Map<string, string> = new Map(); // Map to store threadId to parent commit hash
   
   constructor() {
     this.logService = LogService.getInstance();
     this.agent = new CodeAgent();
+  }
+  
+  /**
+   * Save parent branch name and commit hash for a thread
+   * 
+   * @param threadId The thread ID to save parent info for
+   * @private
+   */
+  private async saveParentInfo(threadId: string): Promise<void> {
+    try {
+      // Get the current branch name
+      const parentBranch = await GitService.getCurrentBranch();
+      this.logService.internal(`Saving parent branch: ${parentBranch} for thread: ${threadId}`);
+      this.parentBranchMap.set(threadId, parentBranch);
+      
+      // Get the current HEAD commit hash
+      const parentCommitHash = await GitService.getHeadCommitHash();
+      this.logService.internal(`Saving parent commit hash: ${parentCommitHash} for thread: ${threadId}`);
+      this.parentCommitHashMap.set(threadId, parentCommitHash);
+    } catch (error) {
+      this.logService.internal(`Error saving parent branch or commit hash: ${error}`);
+    }
   }
   
   /**
@@ -43,6 +67,10 @@ export class AgentService {
     // Create or use existing thread ID and Git branch
     if (!threadId) {
       threadId = uuidv4();
+      
+      // Save parent branch name and commit hash before creating a new branch
+      await this.saveParentInfo(threadId);
+      
       // Create new branch for this thread
       this.logService.internal(`Creating branch for thread: ${threadId}`);
       await GitService.createAndCheckoutBranch(threadId);
@@ -225,10 +253,12 @@ export class AgentService {
    * @param commitMessage Optional custom commit message
    * @returns Result of the squash merge operation
    */
-  async squashAndMergeToParent(threadId: string, commitMessage?: string): Promise<string> {
-    const currentBranch = await GitService.getCurrentBranch();
-    const parentBranch = currentBranch.replace(`durrsor-${threadId}`, '');
-    return await GitService.squashAndMergeToBranch(parentBranch, commitMessage);
+  async squashAndMergeToParent(threadId: string, commitMessage: string): Promise<void> {
+    const parentBranch = this.parentBranchMap.get(threadId);
+    if (!parentBranch) {
+      throw new Error(`No parent branch found for thread: ${threadId}`);
+    }
+    await GitService.squashAndMergeToBranch(parentBranch, commitMessage);
   }
 
   /**
@@ -276,5 +306,71 @@ export class AgentService {
    */
   async getState(threadId: string): Promise<GraphStateType | null> {
     return await this.agent.getState(threadId);
+  }
+  
+  /**
+   * Accept changes by squashing and merging to parent branch
+   * 
+   * @param threadId The thread ID
+   * @throws Error if operation fails
+   */
+  async acceptChanges(threadId: string): Promise<void> {
+    this.logService.internal(`Accepting changes for thread: ${threadId}`);
+    
+    // Get parent branch and commit hash for this thread
+    const parentBranch = this.parentBranchMap.get(threadId);
+    const parentCommitHash = this.parentCommitHashMap.get(threadId);
+    
+    if (!parentBranch || !parentCommitHash) {
+      throw new Error(`No parent branch or commit hash found for thread: ${threadId}`);
+    }
+    
+    this.logService.internal(`Parent branch: ${parentBranch}, parent commit hash: ${parentCommitHash}`);
+    
+    // Get all commits since the parent commit
+    const commits = await GitService.getCommitsSince(parentCommitHash);
+    
+    // Generate merge commit message by concatenating all commit messages
+    let mergeCommitMessage = "Merged changes from thread: " + threadId;
+    
+    if (commits.length > 0) {
+      mergeCommitMessage += "\n\nChanges include:\n";
+      for (const commit of commits) {
+        mergeCommitMessage += `- ${commit.message}\n`;
+      }
+    }
+    
+    // Squash and merge changes to parent branch
+    await this.squashAndMergeToParent(threadId, mergeCommitMessage);
+    
+    this.logService.internal(`Successfully accepted changes for thread: ${threadId}`);
+  }
+
+  /**
+   * Reject changes by checking out parent branch and cleaning up
+   * 
+   * @param threadId The thread ID
+   * @throws Error if operation fails
+   */
+  async rejectChanges(threadId: string): Promise<void> {
+    this.logService.internal(`Rejecting changes for thread: ${threadId}`);
+    
+    // Get parent branch for this thread
+    const parentBranch = this.parentBranchMap.get(threadId);
+    
+    if (!parentBranch) {
+      throw new Error(`No parent branch found for thread: ${threadId}`);
+    }
+    
+    this.logService.internal(`Parent branch: ${parentBranch}`);
+    
+    // Reject changes by checking out parent branch
+    const result = await GitService.rejectChanges(parentBranch);
+    
+    if (result.startsWith('Error:')) {
+      throw new Error(result);
+    }
+    
+    this.logService.internal(`Successfully rejected changes for thread: ${threadId}`);
   }
 } 
